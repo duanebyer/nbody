@@ -39,8 +39,13 @@ using Covector = Tensor<1, 0, Dim>;
  * \brief A rank (N, M) tensor in a finite dimensional space.
  * 
  * A rank (N, M) Tensor is defined to be a linear mapping of N Vector%s and M
- * Covector%s. It is represented by an array of Scalar%s, similar to a matrix
- * but in even higher dimensions.
+ * Covector%s. It is represented by an array of Scalar coordinates, similar to
+ * a matrix but in even higher dimensions. Some of the coordinate indices are
+ * contravariant (written like \f$A^i\f$), and some of the indices are
+ * covariant (written like \f$A_i\f$). Covariant and contravariant indices are
+ * treated separately. When using this class, all contravariant indices are
+ * written first and covariant indices follow after. For instance,
+ * \f$A^ij_kl\f$ is written in code as `A[i][j][k][l]`.
  * 
  * \tparam N the number of contravariant (upper) indices
  * \tparam M the number of covariant (lower) indices
@@ -172,6 +177,59 @@ bool operator==(Tensor<0, 0, Dim> const& lhs, Tensor<0, 0, Dim> const& rhs) {
 template<std::size_t N, std::size_t M, std::size_t Dim>
 bool operator!=(Tensor<N, M, Dim> const& lhs, Tensor<N, M, Dim> const& rhs) {
 	return !operator==(lhs, rhs);
+}
+
+/**
+ * \brief Returns the tensor product of two Tensor%s.
+ */
+template<std::size_t N1, std::size_t M1,
+         std::size_t N2, std::size_t M2,
+         std::size_t Dim>
+Tensor<N1 + N2, M1 + M2, Dim> operator*(Tensor<N1, M1, Dim> const& lhs,
+                                        Tensor<N2, M2, Dim> const& rhs) {
+	// First case: both tensors have contravariant indices, so we must take the
+	// product over the left-hand-side contravariant indices first.
+	Tensor<N1 + N2, M1 + M2, Dim> result;
+	for (std::size_t index = 0; index < Dim; ++index) {
+		result[index] = lhs[index] * rhs;
+	}
+	return result;
+}
+
+template<std::size_t M1,
+         std::size_t N2, std::size_t M2,
+         std::size_t Dim>
+Tensor<N2, M1 + M2, Dim> operator*(Tensor<0, M1, Dim> const& lhs,
+                                   Tensor<N2, M2, Dim> const& rhs) {
+	// Second case: only the second tensor has contravariant indices. Since the
+	// contravariant indices must come first in the resulting tensor, take the
+	// product over the contravariant indices of the right-hand-side.
+	Tensor<N2, M1 + M2, Dim> result;
+	for (std::size_t index = 0; index < Dim; ++index) {
+		result[index] = lhs * rhs[index];
+	}
+	return result;
+}
+
+template<std::size_t M1, std::size_t M2, std::size_t Dim>
+Tensor<0, M1 + M2, Dim> operator*(Tensor<0, M1, Dim> const& lhs,
+                                  Tensor<0, M2, Dim> const& rhs) {
+	// Third case: neither tensor has contravariant indices, so the covariant
+	// indices of the left-hand-side should come next.
+	Tensor<0, M1 + M2, Dim> result;
+	for (std::size_t index = 0; index < Dim; ++index) {
+		result[index] = lhs[index] * rhs;
+	}
+	return result;
+}
+
+template<std::size_t M2, std::size_t Dim>
+Tensor<0, M2, Dim> operator*(Tensor<0, 0, Dim> const& lhs,
+                             Tensor<0, M2, Dim> const& rhs) {
+	// Fourth case: the left-hand-side has no indices of any kind, meaning it
+	// is essentially a scalar. Simply take the scalar product of it with the
+	// right-hand-side. This is the base case.
+	return ((Scalar) lhs) * rhs;
 }
 
 template<std::size_t N, std::size_t M, std::size_t Dim>
