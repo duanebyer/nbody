@@ -160,6 +160,23 @@ public:
 	
 };
 
+/**
+ * \brief Returns the identity matrix.
+ * 
+ * The identity matrix is a (1, 1) Tensor that takes a Vector and a Covector
+ * and returns the sum of the component-wise products.
+ */
+template<std::size_t Dim>
+Tensor<1, 1, Dim> const& identity() {
+	static Tensor<1, 1, Dim> identity;
+	if (identity[0][0] == 0.0) {
+		for (std::size_t index = 0; index < Dim; ++index) {
+			identity[index][index] = 1.0;
+		}
+	}
+	return identity;
+}
+
 template<std::size_t N, std::size_t M, std::size_t Dim>
 bool operator==(Tensor<N, M, Dim> const& lhs, Tensor<N, M, Dim> const& rhs) {
 	bool result = true;
