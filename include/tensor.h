@@ -164,6 +164,11 @@ bool operator==(Tensor<N, M, Dim> const& lhs, Tensor<N, M, Dim> const& rhs) {
 	return result;
 }
 
+template<std::size_t Dim>
+bool operator==(Tensor<0, 0, Dim> const& lhs, Tensor<0, 0, Dim> const& rhs) {
+	return (Scalar) lhs == (Scalar) rhs;
+}
+
 template<std::size_t N, std::size_t M, std::size_t Dim>
 bool operator!=(Tensor<N, M, Dim> const& lhs, Tensor<N, M, Dim> const& rhs) {
 	return !operator==(lhs, rhs);
