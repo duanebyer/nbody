@@ -7,6 +7,13 @@
 
 namespace nbody {
 
+/**
+ * \brief Wraps a piece of data together with a position so that it can be
+ * stored in an Octree.
+ * 
+ * \tparam T the type of data stored in the Octree
+ * \tparam Dim the dimension of the space that the Octree is embedded in
+ */
 template<typename T, std::size_t Dim>
 class OctreeData {
 	
@@ -18,6 +25,21 @@ public:
 	
 };
 
+/**
+ * \brief Represents an Octree node containing child nodes and possibly data.
+ * 
+ * Each OctreeNode either contains a certain number of children, depending on
+ * the dimension of the space, or a single data point.
+ * 
+ * This class can be safely derived from. This should be done if data should
+ * be associated with each individual OctreeNode. For instance, if each
+ * OctreeNode should store the center of mass of its children, then a custom
+ * extension of this class could override certain methods to track changes in
+ * the center of mass.
+ * 
+ * \tparam T the type of data stored in the Octree
+ * \tparam Dim the dimension of the space that the Octree is embedded in
+ */
 template<typename T, std::size_t Dim>
 class OctreeNode {
 	
@@ -25,57 +47,37 @@ private:
 	
 	OctreeNode<T, Dim>* _parent;
 	OctreeNode<T, Dim>* _children[1 << Dim];
+	OctreeData<T, Dim>* _data;
 	
 	Vector<Dim> _dimensions;
 	Vector<Dim> _position;
 	
-	std::vector<OctreeData<T, Dim> > _data;
-	
 public:
 	
-	OctreeNode<T, Dim>* parent() final;
-	OctreeNode<T, Dim>* children() final;
-	OctreeData<T, Dim>* data() final;
+	bool isLeaf() const final {
+		return _data != NULL;
+	}
 	
-	/**
-	 * \brief Adds a new piece of data to the OctreeNode.
-	 * 
-	 * This function will attempt to place the data within this OctreeNode if
-	 * there is room. Otherwise, it will split this OctreeNode, and distribute
-	 * the data among the children. If the position is out of range for this
-	 * OctreeNode, then this function will check the parents of this OctreeNode
-	 * until a suitable position can be found.
-	 * 
-	 * \param data the data to be added
-	 * \param position the position at which the data should be added
-	 * \return a pointer to the data once it has been copied to the OctreeNode,
-	 *         or a null pointer if data could not be added
-	 */
-	OctreeData<T, Dim>* add(T data, Vector<Dim> position) final;
+	OctreeNode<T, Dim>* parent() final {
+		return _parent;
+	}
+	OctreeNode<T, Dim> const* parent() const final {
+		return _parent;
+	}
 	
-	/**
-	 * \brief Removes a piece of data from the OctreeNode.
-	 * 
-	 * The OctreeNode will search both itself and all of its children for the
-	 * piece of data. If it is found, it will be removed.
-	 * 
-	 * \param data the data that should be removed
-	 */
-	void remove(OctreeData<T, Dim>* data) final;
+	OctreeNode<T, Dim>* children() final {
+		return _children;
+	}
+	OctreeNode<T, Dim> const* children() const final {
+		return _children;
+	}
 	
-	/**
-	 * \brief Moves an existing piece of data from one position in the
-	 * OctreeNode to another. If the new position is out of the range of this
-	 * OctreeNode, then the parent of this node will be checked until a
-	 * suitable position can be found.
-	 * 
-	 * \param data a pointer to the data that should be moved
-	 * \param position the new position of the data
-	 * \return a pointer to the new value of the data, or a null pointer of the
-	 *         data could not be moved
-	 */
-	OctreeData<T, Dim>* move(OctreeData<T, Dim>* data,
-	                         Vector<Dim> position) final;
+	OctreeData<T, Dim>* data() final {
+		return _data;
+	}
+	OctreeData<T, Dim> const* data() const final {
+		return _data;
+	}
 	
 	template<typename T, std::size_t Dim, typename N>
 	friend class Octree;
@@ -90,10 +92,13 @@ class Octree final {
 	
 private:
 	
-	N* _root;
+	// A list storing all of the actual data.
+	std::vector<OctreeData<T, Dim> > _data;
+	// A list storing all of the nodes in breadth-first order. The root node
+	// is the first one in the list.
+	std::vector<OctreeNode<T, Dim> > _nodes;
 	
 public:
-	
 	
 	/**
 	 * \brief Returns the root OctreeNode of the entire Octree.
@@ -104,9 +109,6 @@ public:
 	/**
 	 * \brief Adds a new piece of data to the Octree.
 	 * 
-	 * This function is equivalent to calling the OctreeNode::add function on
-	 * the root node of this Octree.
-	 * 
 	 * \param data the data to be added
 	 * \param position the position at which the data should be added
 	 * \return a pointer to the data once it has been copied to the Octree
@@ -116,9 +118,6 @@ public:
 	/**
 	 * \brief Removes a piece of data from the Octree.
 	 * 
-	 * This function is equivalent to calling the OctreeNode::remove function
-	 * on the root node of this Octree.
-	 * 
 	 * \param data a pointer to the data that should be removed
 	 */
 	void remove(OctreeData<T, Dim>* data);
@@ -126,9 +125,6 @@ public:
 	/**
 	 * \brief Moves an existing piece of data from one position in the Octree
 	 * to another.
-	 * 
-	 * This function is equivalent to calling the OctreeNode::move function on
-	 * the root node of this Octree.
 	 * 
 	 * \param data a pointer to the data that should be moved
 	 * \param position the new position of the data
@@ -138,32 +134,43 @@ public:
 	                         Vector<Dim> position);
 	
 	/**
-	 * \brief Returns a depth-first iterator over all of the data in the
-	 * Octree.
+	 * \brief Returns an iterator to the first piece of data.
 	 */
-	DepthIterator depthIterator();
-	ConstDepthIterator depthIterator() const;
+	Iterator begin();
+	ConstIterator begin() const;
 	
 	/**
-	 * \brief Returns a breadth-first iterator over all of the data in the
-	 * Octree.
+	 * \brief Returns an iterator to the last piece of data.
 	 */
-	BreadthIterator breadthIterator();
-	ConstBreadthIterator breadthIterator() const;
+	Iterator end();
+	ConstIterator end() const;
 	
 	/**
-	 * \brief Returns a depth-first iterator over all of the nodes in the
-	 * Octree.
+	 * \brief Returns an iterator to the first OctreeNode in breadth-first
+	 * order.
 	 */
-	NodeDepthIterator nodeDepthIterator();
-	ConstNodeDepthIterator nodeDepthIterator() const;
+	NodeBreadthIterator beginNodeBreadth();
+	ConstNodeBreadthIterator beginNodeBreadth() const;
 	
 	/**
-	 * \brief Returns a breadth-first iterator over all of the nodes in the
-	 * Octree.
+	 * \brief Returns an iterator to the last OctreeNode in breadth-first
+	 * order.
 	 */
-	NodeBreadthIterator nodeBreadthIterator();
-	ConstNodeBreadthIterator nodeBreadthIterator() const;
+	NodeBreadthIterator endNodeBreadth();
+	ConstNodeBreadthIterator endNodeBreadth() const;
+	
+	/**
+	 * \brief Returns an iterator to the first OctreeNode in depth-first
+	 * order.
+	 */
+	NodeDepthIterator beginNodeDepth();
+	ConstNodeDepthIterator beginNodeDepth() const;
+	
+	/**
+	 * \brief Returns an iterator the last OctreeNode in depth-first order.
+	 */
+	NodeDepthIterator endNodeDepth();
+	ConstNodeDepthIterator endNodeDepth() const;
 	
 };
 
