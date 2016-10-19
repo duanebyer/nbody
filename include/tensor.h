@@ -56,9 +56,9 @@ class Tensor final {
 	
 private:
 	
-	using PrevTensor = typename std::conditional<N == 0,
-	                                             Tensor<N, M - 1, Dim>,
-	                                             Tensor<N - 1, M, Dim> >::type;
+	using PrevTensor = std::conditional_t<N == 0,
+	                                      Tensor<N, M - 1, Dim>,
+	                                      Tensor<N - 1, M, Dim> >;
 	
 	PrevTensor _values[Dim];
 	
