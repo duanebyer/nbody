@@ -223,6 +223,17 @@ private:
 		return collapse();
 	}
 	
+	// Checks whether a point is contained within this node.
+	bool contains(Vector<Dim> point) {
+		for (std::size_t dim = 0; dim < Dim; ++dim) {
+			if (point[dim] < _position[dim] ||
+			    point[dim] >=  _position[dim] + _dimensions[dim]) {
+				return false;
+			}
+		}
+		return true;
+	}
+	
 public:
 	
 	~OctreeNode() {
@@ -293,15 +304,17 @@ private:
 	
 	// A list storing all of the actual data. This is so that all of the raw
 	// data can be stored contigiously in memory.
-	std::vector<OctreeData<T, Dim> > _data;
+	std::vector<OctreeData<T, N, Dim> > _data;
 	// The root of the octree. The root contains dynamically allocated data for
 	// the subnodes of the octree.
 	OctreeNode<T, N, Dim> _root;
 	
 public:
 	
+	using Iterator = decltype(_data)::iterator;
+	using ConstIterator = decltype(_data)::const_iterator;
+	
 	Octree(Vector<Dim> position, Vector<Dim> dimensions) : _data(), _nodes() {
-		_nodes.push_back(OctreeNode(NULL, position, dimensions));
 	}
 	
 	/**
@@ -319,35 +332,83 @@ public:
 	 * 
 	 * \param data the data to be added
 	 * \param position the position at which the data should be added
-	 * \return a pointer to the OctreeNode that now stores the data
+	 * \return an iterator to the position at which the data is stored
 	 */
-	OctreeNode<T, N, Dim>* add(T data, Vector<Dim> position);
+	Iterator add(T data, Vector<Dim> position) {
+		std::size_t dataIndex = _nodes.size();
+		_data.push_back(OctreeData<T, N, Dim>(NULL, data, position));
+		_root.add(dataIndex);
+		return _data.end() - 1;
+	}
 	
 	/**
 	 * \brief Removes a piece of data from the Octree.
 	 * 
-	 * \param data a pointer to the data that should be removed
-	 * \return a pointer to the OctreeNode that stored the data
+	 * \param it an iterator to the data that should be removed
+	 * \return an iterator to the data following the removed data
 	 */
-	OctreeNode<T, N, Dim>* remove(OctreeData<T, Dim>* data);
+	Iterator remove(ConstIterator it) {
+		// Remove the data from the vector, and then loop through and decrease
+		// the data index for the parent of every following piece of data.
+		OctreeNode<T, N, Dim>* parent = it->_parent;
+		Iterator eraseIt = _data->erase(it);
+		parent->remove(*it);
+		Iterator end = _data.end();
+		for (Iterator loopIt = eraseIt; loopIt != end; ++loopIt) {
+			loopIt->_parent->_data -= 1;
+		}
+		return eraseIt;
+	}
+	
+	Iterator remove(Iterator it) {
+		return remove((ConstIterator) it);
+	}
 	
 	/**
 	 * \brief Moves an existing piece of data from one position in the Octree
 	 * to another.
 	 * 
-	 * \param data a pointer to the data that should be moved
+	 * \param it an iterator to the data that should be moved
 	 * \param position the new position of the data
-	 * \return a pair containing the old OctreeNode and the new OctreeNode
+	 * \return an iterator to the new data
 	 */
-	std::pair<OctreeNode<T, N, Dim>*, std::pair<OctreeNode<T, N, Dim> >
-	move(OctreeData<T, Dim>* data,
-	     Vector<Dim> position);
+	Iterator move(ConstIterator it, Vector<Dim> position) {
+		OctreeNode<T, N, Dim>* parent = it->_parent;
+		std::size_t dataIndex = parent->_data;
+		it->_position = position;
+		// If the parent no longer contains the data, then remove the data from
+		// its current parent, and go up the tree until a node is reached that
+		// can store the data.
+		if (!parent->contains(it->_position)) {
+			parent->remove(*it);
+			OctreeNode<T, N, Dim>* node = parent;
+			do {
+				node = node->_parent;
+			} while (!node->contains(it->_position));
+			node->add(dataIndex);
+		}
+		return it;
+	}
 	
-	OctreeData<T, Dim>* data() {
+	Iterator begin() {
+		return _data.begin();
+	}
+	ConstIterator begin() const {
+		return _data.begin();
+	}
+	
+	Iterator end() {
+		return _data.end();
+	}
+	ConstIterator end() const {
+		return _data.end();
+	}
+	
+	OctreeData<T, N, Dim>* data() {
 		return _data;
 	}
 	
-	OctreeData<T, Dim> const* data() const {
+	OctreeData<T, N, Dim> const* data() const {
 		return _data;
 	}
 	
