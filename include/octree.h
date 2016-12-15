@@ -1,6 +1,7 @@
 #ifndef __NBODY_OCTREE_H_
 #define __NBODY_OCTREE_H_
 
+#include <algorithm>
 #include <cstddef>
 #include <type_traits>
 #include <utility>
@@ -14,43 +15,32 @@ namespace nbody {
  * \brief Wraps a piece of data together with a position so that it can be
  * stored at the leaf of an Octree.
  * 
- * \tparam T the type of data stored at the leaves of the Octree
- * \tparam N the type of data stored at the nodes of the Octree
+ * \tparam Data the type of data stored at the leaves of the Octree
  * \tparam Dim the dimension of the space that the Octree is embedded in
  */
-template<typename T, typename N, std::size_t Dim>
+template<typename Data, std::size_t Dim>
 class OctreeData final {
-	
-	friend class Octree<T, N, Dim>;
-	friend class OctreeNode<T, N, Dim>;
+	template<typename Data, typename Node, std::size_t Num, std::size_t Dim>
+	friend class Octree;
+	template<typename Data, typename Node, std::size_t Num, std::size_t Dim>
+	friend class OctreeNode;
 	
 private:
 	
-	OctreeNode<T, N, Dim>* _parent;
-	T _data;
+	Data _data;
 	Vector<Dim> _position;
 	
-	OctreeData(OctreeNode<T, N, Dim>* parent,
-	           T data,
-	           Vector<Dim> position) :
-	           _parent(parent),
-	           _data(data),
-	           _position(position) {
+	OctreeData(Data data, Vector<Dim> position) :
+			_data(data),
+			_position(position) {
 	}
 	
 public:
 	
-	OctreeNode<T, N, Dim>& parent() {
-		return *_parent;
-	}
-	OctreeNode<T, N, Dim> const& parent() const {
-		return *_parent;
-	}
-	
-	T& data() {
+	Data& data() {
 		return _data;
 	}
-	T const& data() const {
+	Data const& data() const {
 		return _data;
 	}
 	
@@ -74,248 +64,286 @@ public:
  * change is made to the OctreeNode or its children, its internal data is also
  * updated.
  * 
- * \tparam T the type of data stored at the leaves of the Octree
- * \tparam N the type of data stored at the nodes of the Octree
+ * \tparam Data the type of data stored at the leaves of the Octree
+ * \tparam Node the type of data stored at the nodes of the Octree
  * \tparam Dim the dimension of the space that the Octree is embedded in
  */
-template<typename T, typename N, std::size_t Dim>
+template<typename Data, typename Node, std::size_t Dim>
 class OctreeNode final {
 	
-	friend class Octree<T, N, Dim>;
+	friend class Octree<Data, Node, Dim>;
 	
 private:
 	
-	// All OctreeNodes are guaranteed to be stored contigiously.
+	// All OctreeNodes are guaranteed to be stored contigiously. OctreeNodes
+	// can only be referred to by reference or by pointer. The memory location
+	// of an OctreeNode is guaranteed to be within an Octree's list of nodes.
 	
 	// The octree that contains this node.
-	Octree<T, N, Dim> const* _octree;
+	Octree<Data, Node, Num, Dim> const* _octree;
 	
-	// The parent of this node.
-	OctreeNode<T, N, Dim>* _parent;
-	// The children of this node. They are dynamically allocated and managed by
-	// this node.
-	OctreeNode<T, N, Dim>* _children;
-	// The location of the data of this node. Because the data is stored in
-	// dynamic memory, a direct pointer cannot be stored.
+	// Whether this node has any children currently.
+	bool _hasChildren;
+	// The indices of the children of this node, stored relative to the index
+	// of this node. The last entry points to the next sibling of this node,
+	// and is used to determine the total size of all of this node's children.
+	std::size_t _childIndices[(1 << Dim) + 1];
+	
+	// Whether this node has a parent.
+	bool _hasParent;
+	// The relative index of the parent of this node.
+	std::ptrdiff_t _parentIndex;
+	// Which child # of its parent this node is. (0th child, 1st child, etc).
+	std::size_t _siblingIndex;
+	
+	// The number of data points that this node contains.
+	std::size_t _dataCount;
+	// The data points that this node contains are located at this index.
 	std::size_t _dataIndex;
-	
-	// Whether this node has any data.
-	bool _hasData;
 	
 	// The section of space that this node encompasses.
 	Vector<Dim> _position;
 	Vector<Dim> _dimensions;
 	
-	OctreeNode() :
-			_octree(NULL),
-			_parent(NULL),
-			_children(NULL),
-			_hasData(false),
+	OctreeNode(Octree<Data, Node, Dim> const* octree) :
+			_octree(octree),
+			_hasChildren(false),
+			_childIndices(),
+			_hasParent(false),
+			_dataCount(0),
+			_dataIndex(0),
 			_position(),
 			_dimensions() {
 	}
 	
-	// These operators allow for copying of the node along with all of its
-	// structure, but the data contained within the octree is not copied.
-	// Because of this, these operators are not public.
-	OctreeNode(OctreeNode<T, N, Dim> const& other) :
-			_octree(other._octree),
-			_parent(other._parent),
-			_hasData(other._hasData),
-			_dataIndex(other._dataIndex),
-			_position(other._position),
-			_dimensions(other._dimensions) {
-		if (other.hasChildren()) {
-			createChildren();
-			for (std::size_t index = 0; index < (1 << Dim); ++index) {
-				_children[i] = OctreeNode(other._children[i]);
-			}
-		}
-	}
+	OctreeNode(OctreeNode<Data, Node, Dim> const&) = delete;
+	void operator=(OctreeNode<Data, Node, Dim> const&) = delete;
 	
-	OctreeNode(OctreeNode<T, N, Dim>&& other) :
-			_octree(other._octree),
-			_parent(other._parent),
-			_children(other._children),
-			_hasData(other._hasData),
-			_dataIndex(other._dataIndex),
-			_position(other._position),
-			_dimensions(other._dimensions) {
-		other._children = NULL;
-	}
-	
-	~OctreeNode() {
-		destroyChildren();
-	}
-	
-	OctreeNode<T, N, Dim>& operator=(OctreeNode<T, N, Dim> const& other) {
-		_octree = other._octree;
-		_parent = other._parent;
-		_hasData = other._hasData;
-		_dataIndex = other._dataIndex;
-		_position = other._position;
-		_dimensions = other._dimensions;
-		
-		destroyChildren();
-		if (other.hasChildren()) {
-			createChildren();
-			for (std::size_t index = 0; index < (1 << Dim); ++index) {
-				_children[i] = OctreeNode(other._children[i]);
-			}
-		}
-		return *this;
-	}
-	
-	OctreeNode<T, N, Dim>& operator=(OctreeNode<T, N, Dim>&& other) {
-		_octree = other._octree;
-		_parent = other._parent;
-		_hasData = other._hasData;
-		_dataIndex = other._dataIndex;
-		_position = other._position;
-		_dimensions = other._dimensions;
-		
-		destroyChildren();
-		_children = other._children;
-		other._children = NULL;
-		return *this;
-	}
-	
-	
-	// Creates the dynamic array that stores the children of this node.
+	// Divides this node into a set of subnodes and partitions its data between
+	// them
 	void createChildren() {
-		// Create the children and spatially position them so that they cover
-		// the hypercube defined by this node.
-		delete [] _children;
-		_children = new OctreeNode<T, N, Dim>[1 << Dim];
+		// Create the 2^Dim child nodes inside the parent octree.
+		auto begin = _octree->_nodes.begin();
+		auto parent = begin + (this - &_octree->_nodes.front());
+		auto firstChild = _octree->_nodes.insert(
+			parent, 1 << Dim,
+			OctreeNode<Data, Node, Dim>(_octree));
+		
+		// Update the iterators as they have been invalidated.
+		begin = _octree->_nodes.begin();
+		parent = begin + (this - &_octree->_nodes.front());
+		
+		// Loop through the new children, and set up their various properties.
+		Vector<Dim> childDimensions = _dimensions / 2;
+		Vector<Dim> midpoint = _position + childDimensions;
+		auto child = firstChild;
 		for (std::size_t index = 0; index < (1 << Dim); ++index) {
-			OctreeNode<T, N, Dim>& child = _children[index];
-			child._octree = _octree;
-			child._parent = this;
-			child._dimensions = _dimensions / 2.0;
-			child._position = _position;
-			
+			child->_hasParent = true;
+			child->_parentIndex = -((std::ptrdiff_t) index + 1);
+			child->_siblingIndex = index;
+			child->_dataIndex = _dataIndex + _dataCount;
+			child->_dimensions = childDimensions;
+			child->_position = _position;
+			// Shift the child position depending on which child it is.
 			for (std::size_t dim = 0; dim < Dim; ++dim) {
-				if ((index >> dim) & 1) {
-					child._position[dim] += child._dimensions[dim];
+				if ((1 << dim) & index) {
+					child->_position[dim] = midpoint[dim];
 				}
 			}
+			++child;
+			
+			// Add the child to this node.
+			_childIndices[index] = index + 1;
 		}
-	}
-	
-	// Cleans up the dynamic array that stores the children of this node.
-	void destroyChildren() {
-		delete [] _children;
-		_children = NULL;
-	}
-	
-	// Returns a pointer to the child that contains the specified position.
-	OctreeNode<T, N, Dim>* getChildByPosition(Vector<Dim> position) {
-		OctreeNode<T, N, Dim>* child = _children;
-		for (std::size_t dim = 0; dim < Dim; ++dim) {
-			if (dataPos[dim] - _position[dim] >= _dimensions[dim] / 2.0) {
-				child += (1 << dim);
+		
+		// Go through the parent, grandparent, great-grandparent, ...  of this
+		// node and update their child indices.
+		while (parent->_hasParent) {
+			std::size_t siblingIndex = parent->_siblingIndex;
+			parent += parent->_parentIndex;
+			while (++siblingIndex <= (1 << Dim)) {
+				parent->_childIndices[siblingIndex] += (1 << Dim);
 			}
 		}
-		return child;
+		
+		// Distribute the data of this node to the children.
+		for (std::size_t index = 0; index < _dataCount; ++index) {
+			// Figure out which node the data belongs to.
+			std::childIndex = 0;
+			auto data = _octree->_data.begin() + _dataIndex + index;
+			Vector<Dim> const& position = data->position();
+			for (std::size_t dim = 0; dim < Dim; ++dim) {
+				if (position[dim] >= midpoint[dim]) {
+					childIndex += (1 << dim);
+				}
+			}
+			moveData(data, firstChild + childIndex);
+		}
+	}
+	
+	// Destroys the subnodes of this node and takes their data into this node.
+	void destroyChildren() {
+		// Determine how many children, grandchildren, great-grandchildren, ...
+		// of this node.
+		std::size_t numDescendants = _childIndices[1 << Dim];
+		auto begin = _octree->_nodes.begin();
+		auto parent = begin + (this - &_octree->_nodes.front());
+		
+		// Reassign all of the data to this node.
+		std::size_t lastDataIndex = (parent + numDescendants)->_dataIndex;
+		_dataCount = lastDataIndex - _dataIndex;
+		
+		// Destroy the subnodes and update iterators.
+		_octree->_nodes->erase(parent + 1, parent + 1 + numDescendants);
+		begin = _octree->_nodes.begin();
+		parent = begin + (this - &_octree->nodes.front());
+		
+		// Go through the parent, grandparent, great-grandparent, ... of this
+		// node and update their child indices.
+		while (parent->_hasParent) {
+			std::size_t siblingIndex = parent->_siblingIndex;
+			parent += parent->_parentIndex;
+			while (++siblingIndex <= (1 << Dim)) {
+				parent->_childIndices[siblingIndex] -= numDescendants;
+			}
+		}
+	}
+	
+	// Creates a parent node that contains this node.
+	void createParent() {
+	}
+	
+	// Destroys all ancestors of this node and takes their data into this node.
+	void destroyParent() {
+	}
+	
+	// Adds a piece of data to the octree, starting the search for the correct
+	// node at this node.
+	Octree<Node, Data, Dim>::DataIterator insertData(
+			OctreeData<Data, Dim> const& data) {
+		
+		Vector<Dim> position = data.position();
+		bool contains = contains(position);
+		bool canHoldData =
+			!_hasChildren &&
+			_dataCount < _octree->nodeCapacity;
+		if (contains && canHoldData) {
+			return insertDataAt(octreeData);
+		}
+		else if (contains && !canHoldData) {
+			return insertDataBelow(octreeData);
+		}
+		else {
+			return insertDataAbove(octreeData);
+		}
 	}
 	
 	// Adds a piece of data to this node.
-	void addData(OctreeData<T, N, Dim>* data) {
-		_dataIndex = data - _octree->_data;
-		_hasData = true;
-		data->_parent = this;
-	}
-	
-	// Removes the data from this node.
-	void removeData() {
-		_hasData = false;
-		_octree->_data[_dataIndex]->_parent = NULL;
-	}
-	
-	// Takes the data stored by this node, and moves it into another node while
-	// removing it from this node.
-	void transferData(OctreeNode<T, N, Dim>* other) {
-		other->_hasData = _hasData;
-		other->_dataIndex = _dataIndex;
-		if (other->_hasData) {
-			_octree->_data[_dataIndex]->_parent = other;
+	Octree<Node, Data, Dim>::DataIterator insertDataAt(
+			OctreeData<Data, Dim> const& data) {
+		// Add the data to the master list of data in the octree and update
+		// internal variables.
+		auto begin = _octree->_data.begin();
+		auto newData = _octree->_data.insert(begin + _dataIndex + _dataCount);
+		++_dataCount;
+		
+		// Loop through the rest of the nodes and increment their data indices
+		// so that they still refer to the correct location in the data vector.
+		auto begin = _octree->_nodes.begin();
+		auto end = _octree->_nodes.end();
+		auto node = begin + (this - &_octree->nodes.first());
+		while (++node != end) {
+			++node->_dataIndex;
 		}
-		_hasData = false;
+		
+		return newData;
 	}
 	
-	// Takes the data stored by this node and moves it to the appropriate
-	// child.
-	void transferDataChild() {
-		Vector<Dim> dataPos = _octree->_data[_dataIndex].position();
-		transferData(getChildByPosition(dataPos));
-	}
-	
-	// Takes the data stored by this node and moves it to the parent.
-	void transferDataParent() {
-		transferData(_parent);
-	}
-	
-	// The following functions are the ones which should actually be used by
-	// the Octree class in almost all cases.
-	
-	// Adds a piece of data to this node. If this node already contains data,
-	// then this node given children. If this node has children, then the data
-	// is sent to the appropriate child.
-	OctreeNode<T, N, Dim>* insert(OctreeData<T, N, Dim>* data) {
-		if (hasData()) {
+	// Adds a data point to a child of this node, splitting this node into
+	// subnodes if necessary.
+	Octree<Data, Node, Dim>::DataIterator insertDataBelow(
+			OctreeData<Data, Dim> const& data) {
+		if (!_hasChildren) {
 			createChildren();
 		}
-		if (hasChildren()) {
-			return getChildByPosition(data->position())->insert(data);
-		}
-		else {
-			addData(data);
-			return this;
-		}
-	}
-	
-	// Checks if a node should be merged with its siblings. Recursively calls
-	// itself on its parent after a successful merge. This result is the first
-	// node in the chain that does not get merged with its siblings.
-	OctreeNode<T, N, Dim>* collapse() {
-		if (_parent != NULL) {
-			std::size_t numData = 0;
-			OctreeNode<T, N, Dim>* dataChild = _parent->_children;
-			for (std::size_t index = 0; index < (1 << Dim); ++index) {
-				OctreeNode<T, N, Dim>* child = _parent->_children + index;
-				numData += child->_hasData;
-				if (numData == 1) {
-					dataChild = child;
-				}
-			}
-			if (numData <= 1) {
-				dataChild->transferData(parent);
-				parent->destroyChildren();
-				return parent->collapse();
+		
+		auto begin = _octree->_nodes.begin();
+		auto node = begin + (this - &_octree->_nodes.first());
+		
+		// Determine which child the data should be inserted to.
+		Vector<Dim> dataPosition = data.position();
+		Vector<Dim> position = _position;
+		Vector<Dim> midpoint = position + _dimensions / 2;
+		std::size_t childIndex = 0;
+		for (std::size_t dim = 0; dim < Dim; ++dim) {
+			if (dataPosition[dim] >= midpoint[dim]) {
+				childIndex += (1 << Dim);
 			}
 		}
 		
-		return this;
+		// Insert the data into the child.
+		auto child = node + childIndex;
+		return child->insertData(data);
 	}
 	
-	// Removes the data from this node, then collapses the node.
-	OctreeNode<T, N, Dim>* erase() {
-		removeData();
-		return collapse();
+	// Adds a data point to a parent of this node, creating a new node to act
+	// as a parent if necessary.
+	Octree<Data, Node, Dim>::DataIterator insertDataAbove(
+			OctreeData<Data, Dim> const& data) {
+		if (!_hasParent) {
+			createParent();
+		}
+		
+		// Insert the data into the parent.
+		auto begin = _octree->_nodes.begin();
+		auto node = begin + (this - &_octree->_nodes.first());
+		auto parent = node + _parentIndex;
+		parent->insertData(data);
 	}
 	
-	// Checks whether a point is contained within this node.
-	bool contains(Vector<Dim> point) {
+	// Removes a piece of data from this node.
+	Octree<Node, Data, Dim>::DataIterator eraseData(
+			Octree<Node, Data, Dim>::DataIterator data) {
+	}
+	
+	// Moves a piece of data from this node to another one.
+	Octree<Node, Data, Dim>::DataIterator moveData(
+			Octree<Node, Data, Dim>::DataIterator data,
+			Octree<Node, Data, Dim>::NodeIterator node) {
+	}
+	
+public:
+	
+	Octree<Data, Node, Dim>::DataIterator insert(
+			Data const& data,
+			Vector<Dim> const& position) {
+		// Create a new data structure containing the information, determine
+		// whether it should be inserted above or below, then call the
+		// appropriate function.
+		OctreeData<Data, Dim> octreeData(data, position);
+		return insertData(octreeData);
+	}
+	
+	Octree<Data, Node, Dim>::DataIterator erase(
+			Octree<Data, Node, Dim>::DataIterator it) {
+	}
+	
+	Octree<Data, Node, Dim>::DataIterator erase(
+			Octree<Data, Node, Dim>::ConstDataIterator it) {
+	}
+	
+	bool contains(Vector<Dim> const& point) {
+		Vector<Dim> lower = _position;
+		Vector<Dim> upper = _position + _dimensions;
 		for (std::size_t dim = 0; dim < Dim; ++dim) {
-			if (point[dim] < _position[dim] ||
-			    point[dim] >=  _position[dim] + _dimensions[dim]) {
+			// De Morgan's law has been applied here so that NaN is dealt with
+			// appropriately.
+			if (!(point[dim] >= lower[dim] && point[dim] < upper[dim])) {
 				return false;
 			}
 		}
 		return true;
 	}
-	
-public:
 	
 	bool hasChildren() const {
 		return _children != NULL;
@@ -347,7 +375,7 @@ public:
 		return _octree->_data[_dataIndex];
 	}
 	OctreeData<T, Dim> const& data() const {
-		return _octree->_data[_data];
+		return _octree->_data[_dataIndex];
 	}
 	
 	Vector<Dim> position() const {
@@ -364,31 +392,35 @@ public:
  * \brief A data structure that stores positional data in arbitrary
  * dimensional space.
  * 
- * \tparam T the type of data stored at the leaves of the Octree
- * \tparam N the type of data stored at the nodes of the Octree
+ * \tparam Data the type of data stored at the leaves of the Octree
+ * \tparam Node the type of data stored at the nodes of the Octree
  * \tparam Dim the dimension of the space that the Octree is embedded in
  */
-template<typename T, typename N, std::size_t Dim = 3>
+template<typename Data, typename Node, std::size_t Dim>
 class Octree final {
-	
-	static_assert(std::is_base_of<OctreeNode<T, Dim>, N>::value,
-	              "N must derive from OctreeNode");
 	
 private:
 	
-	// A list storing all of the actual data. This is so that all of the raw
-	// data can be stored contigiously in memory.
-	std::vector<OctreeData<T, N, Dim> > _data;
-	// The root of the octree. The root contains dynamically allocated data for
-	// the subnodes of the octree.
-	OctreeNode<T, N, Dim> _root;
+	// A list storing all of the nodes of the octree.
+	std::vector<OctreeNode<Dim, Node, Dim> > _nodes;
+	
+	// A list storing all of the actual data.
+	std::vector<OctreeData<Data, Dim> > _data
+	
+	// The number of data points to store at a single node of the octree.
+	std::size_t _nodeCapacity;
 	
 public:
 	
-	using Iterator = decltype(_data)::iterator;
-	using ConstIterator = decltype(_data)::const_iterator;
+	using NodeIterator = decltype(_nodes)::iterator;
+	using ConstNodeIterator = decltype(_nodes)::const_iterator;
+	using DataIterator = decltype(_data)::iterator;
+	using ConstDataIterator = decltype(_data)::const_iterator;
 	
-	Octree(Vector<Dim> position, Vector<Dim> dimensions) : _data(), _nodes() {
+	Octree(Vector<Dim> position, Vector<Dim> dimensions) :
+			_nodes(),
+			_data(),
+			_nodeCapacity(1) {
 	}
 	
 	/**
