@@ -3,6 +3,7 @@
 
 #include <algorithm>
 #include <cstddef>
+#include <stdexcept>
 #include <type_traits>
 #include <utility>
 #include <vector>
@@ -96,7 +97,8 @@ private:
 	// Which child # of its parent this node is. (0th child, 1st child, etc).
 	std::size_t _siblingIndex;
 	
-	// The number of data points that this node contains.
+	// The number of data points that this node contains. This includes data
+	// points stored by all descendants of this node.
 	std::size_t _dataCount;
 	// The data points that this node contains are located at this index.
 	std::size_t _dataIndex;
@@ -120,18 +122,18 @@ private:
 	void operator=(OctreeNode<Data, Node, Dim> const&) = delete;
 	
 	// Divides this node into a set of subnodes and partitions its data between
-	// them
+	// them.
 	void createChildren() {
 		// Create the 2^Dim child nodes inside the parent octree.
 		auto begin = _octree->_nodes.begin();
-		auto parent = begin + (this - &_octree->_nodes.front());
+		auto node = begin + (this - &_octree->_nodes.front());
 		auto firstChild = _octree->_nodes.insert(
-			parent, 1 << Dim,
+			node, 1 << Dim,
 			OctreeNode<Data, Node, Dim>(_octree));
 		
 		// Update the iterators as they have been invalidated.
 		begin = _octree->_nodes.begin();
-		parent = begin + (this - &_octree->_nodes.front());
+		node = begin + (this - &_octree->_nodes.front());
 		
 		// Loop through the new children, and set up their various properties.
 		Vector<Dim> childDimensions = _dimensions / 2;
@@ -158,11 +160,14 @@ private:
 		
 		// Go through the parent, grandparent, great-grandparent, ...  of this
 		// node and update their child indices.
+		auto parent = node;
 		while (parent->_hasParent) {
 			std::size_t siblingIndex = parent->_siblingIndex;
 			parent += parent->_parentIndex;
 			while (++siblingIndex <= (1 << Dim)) {
 				parent->_childIndices[siblingIndex] += (1 << Dim);
+				auto child = parent + parent->_childIndices[siblingIndex];
+				child->_parentIndex -= (1 << Dim);
 			}
 		}
 		
@@ -181,40 +186,32 @@ private:
 		}
 	}
 	
-	// Destroys the subnodes of this node and takes their data into this node.
+	// Destroys all descendants of this node and takes their data into this
+	// node.
 	void destroyChildren() {
 		// Determine how many children, grandchildren, great-grandchildren, ...
 		// of this node.
 		std::size_t numDescendants = _childIndices[1 << Dim];
 		auto begin = _octree->_nodes.begin();
-		auto parent = begin + (this - &_octree->_nodes.front());
-		
-		// Reassign all of the data to this node.
-		std::size_t lastDataIndex = (parent + numDescendants)->_dataIndex;
-		_dataCount = lastDataIndex - _dataIndex;
+		auto node = begin + (this - &_octree->_nodes.front());
 		
 		// Destroy the subnodes and update iterators.
-		_octree->_nodes->erase(parent + 1, parent + 1 + numDescendants);
+		_octree->_nodes->erase(node + 1, node + 1 + numDescendants);
 		begin = _octree->_nodes.begin();
-		parent = begin + (this - &_octree->nodes.front());
+		node = begin + (this - &_octree->nodes.front());
 		
 		// Go through the parent, grandparent, great-grandparent, ... of this
 		// node and update their child indices.
+		auto parent = node;
 		while (parent->_hasParent) {
 			std::size_t siblingIndex = parent->_siblingIndex;
 			parent += parent->_parentIndex;
 			while (++siblingIndex <= (1 << Dim)) {
 				parent->_childIndices[siblingIndex] -= numDescendants;
+				auto child = parent + parent->_childIndices[siblingIndex];
+				child->_parentIndex += numDescendants;
 			}
 		}
-	}
-	
-	// Creates a parent node that contains this node.
-	void createParent() {
-	}
-	
-	// Destroys all ancestors of this node and takes their data into this node.
-	void destroyParent() {
 	}
 	
 	// Adds a piece of data to the octree, starting the search for the correct
@@ -245,15 +242,22 @@ private:
 		// internal variables.
 		auto begin = _octree->_data.begin();
 		auto newData = _octree->_data.insert(begin + _dataIndex + _dataCount);
-		++_dataCount;
 		
 		// Loop through the rest of the nodes and increment their data indices
 		// so that they still refer to the correct location in the data vector.
 		auto begin = _octree->_nodes.begin();
 		auto end = _octree->_nodes.end();
 		auto node = begin + (this - &_octree->nodes.first());
-		while (++node != end) {
-			++node->_dataIndex;
+		auto currentNode = node;
+		while (++currentNode != end) {
+			++currentNode->_dataIndex;
+		}
+		
+		// Also loop through all ancestors and increment their data counts.
+		auto parent = node;
+		while (parent->_hasParent) {
+			++parent->_dataCount;
+			parent += parent->_parentIndex;
 		}
 		
 		return newData;
@@ -286,30 +290,213 @@ private:
 		return child->insertData(data);
 	}
 	
-	// Adds a data point to a parent of this node, creating a new node to act
-	// as a parent if necessary.
+	// Adds a data point to a parent of this node.
 	Octree<Data, Node, Dim>::DataIterator insertDataAbove(
 			OctreeData<Data, Dim> const& data) {
 		if (!_hasParent) {
-			createParent();
+			// The data is out of range, so don't actually insert it.
+			return _octree->_data.end();
 		}
-		
-		// Insert the data into the parent.
 		auto begin = _octree->_nodes.begin();
 		auto node = begin + (this - &_octree->_nodes.first());
 		auto parent = node + _parentIndex;
-		parent->insertData(data);
+		return parent->insertData(data);
+	}
+	
+	// Removes a piece of data from the octree, starting the search at this
+	// node.
+	Octree<Node, Data, Dim>::DataIterator eraseData(
+			Octree<Node, Data, Dim>::DataIterator data) {
+		// Check whether the data is contained by this node.
+		std::size_t dataIndex = data - _octree->_data.begin();
+		std::size_t lower = _dataIndex;
+		std::size_t upper = lower + _dataCount;
+		
+		bool contains = dataIndex >= lower && dataIndex < upper;
+		
+		if (contains && !_hasChildren) {
+			return eraseDataAt(data);
+		}
+		else if (contains && _hasChildren) {
+			return eraseDataBelow(data);
+		}
+		else {
+			return eraseDataAbove(data);
+		}
 	}
 	
 	// Removes a piece of data from this node.
-	Octree<Node, Data, Dim>::DataIterator eraseData(
+	Octree<Node, Data, Dim>::DataIterator eraseDataAt(
 			Octree<Node, Data, Dim>::DataIterator data) {
+		// Remove the data from the master octree data vector.
+		auto next = _octree->_data.erase(data);
+		
+		// Loop through the rest of the nodes and increment their data indices
+		// so that they still refer to the correct location in the data vector.
+		auto begin = _octree->_nodes.begin();
+		auto end = _octree->_nodes.end();
+		auto node = begin + (this - &_octree->nodes.first());
+		auto currentNode = node;
+		while (++currentNode != end) {
+			--currentNode->_dataIndex;
+		}
+		
+		// Loop through all of the ancestors of this node and decremement their
+		// data counts.
+		auto parent = node;
+		while (parent->_hasParent) {
+			--parent->_dataCount;
+			parent += parent->_parentIndex;
+		}
+		
+		return next;
+	}
+	
+	// Removes a piece of data from a child of this node.
+	Octree<Node, Data, Dim>::DataIterator eraseDataBelow(
+			Octree<Node, Data, Dim>::DataIterator data) {
+		// Loop through the children of this node until the one that contains
+		// the data is found.
+		std::size_t dataIndex = data - _octree->_data.begin();
+		auto begin = _octree->_nodes.begin();
+		auto node = begin + (this - &_octree->_nodes.first());
+		for (std::size_t index = 0; index < (1 << Dim); ++index) {
+			auto child = node + _childIndices[index];
+			std::size_t lower = child->_dataIndex;
+			std::size_t upper = lower + child->_dataCount;
+			if (dataIndex >= lower && dataIndex < upper) {
+				return child->eraseData(data);
+			}
+		}
+		return _octree->_data.end();
+	}
+	
+	// Removes a piece of data from a parent of this node.
+	Octree<Node, Data, Dim>::DataIterator eraseDataAbove(
+			Octree<Node, Data, Dim>::DataIterator data) {
+		if (_hasParent) {
+			return _octree->_data.end();
+		}
+		auto begin = _octree->_nodes.begin();
+		auto node = begin + (this - &_octree->_nodes.first());
+		auto parent = node + _parentIndex;
+		return parent->eraseData(data);
+	}
+	
+	// Moves a piece of data within the octree from one node to another one,
+	// starting the search at this node.
+	Octree<Node, Data, Dim>::DataIterator moveData(
+			Octree<Node, Data, Dim>::DataIterator sourceData,
+			Octree<Node, Data, Dim>::NodeIterator destNode) {
+		// Check whether the data is contained by this node.
+		std::size_t dataIndex = data - _octree->_data.begin();
+		std::size_t lower = _dataIndex;
+		std::size_t upper = lower + _dataCount;
+		
+		bool contains = dataIndex >= lower && dataIndex < upper;
+		
+		if (contains && !_hasChildren) {
+			return moveDataAt(data);
+		}
+		else if (contains && _hasChildren) {
+			return moveDataBelow(data);
+		}
+		else {
+			return moveDataAbove(data);
+		}
 	}
 	
 	// Moves a piece of data from this node to another one.
-	Octree<Node, Data, Dim>::DataIterator moveData(
-			Octree<Node, Data, Dim>::DataIterator data,
-			Octree<Node, Data, Dim>::NodeIterator node) {
+	Octree<Node, Data, Dim>::DataIterator moveDataAt(
+			Octree<Node, Data, Dim>::DataIterator sourceData,
+			Octree<Node, Data, Dim>::NodeIterator destNode) {
+		// Reinsert the data into the data vector in its new position.
+		auto beginData = _octree->_data.begin();
+		auto destData = beginData + destNode->_dataIndex + destNode->_dataCount;
+		bool inverted = sourceData > destData;
+		auto firstData = inverted ? destData : sourceData;
+		auto lastData = inverted ? sourceData : destData;
+		
+		std::size_t sourceDataIndex = sourceData - beginData;
+		std::size_t destDataIndex = destData - beginData;
+		
+		std::rotate(firstData, sourceData + !inverted, lastData + inverted);
+		
+		// Adjust the ancestors of the source node.
+		auto beginNode = _octree->_nodes.begin();
+		auto sourceNode = beginNode + (this - &_nodes.first());
+		auto sourceParentNode = sourceNode;
+		std::size_t sourceChildIndex = 0;
+		while (!(
+				destDataIndex >= sourceParentNode->_dataIndex &&
+				destDataIndex < sourceParentNode->_dataIndex +
+				                sourceParentNode->_dataCount)) {
+			--sourceParentNode->_dataCount;
+			std::size_t siblingIndex = sourceParentNode->_siblingIndex;
+			sourceParentNode += sourceParentNode->_parentIndex;
+			sourceChildIndex += sourceParentNode->_childIndices[siblingIndex];
+		}
+		
+		// Adjust the ancestors of the destination node.
+		auto destParentNode = destNode;
+		std::size_t destChildIndex = 0;
+		while (!(
+				sourceDataIndex >= destParentNode->_dataIndex &&
+				sourceDataIndex < destParentNode->_dataIndex +
+				                  destParentNode->_dataCount)) {
+			++destParentNode->_dataCount;
+			std::size_t siblingIndex = destParentNode->_siblingIndex;
+			destParentNode += destParentNode->_parentIndex;
+			destChildIndex += destParentNode->_childIndices[siblingIndex];
+		}
+		
+		// Both sourceParentNode and destParentNode should be equal to the same
+		// node: the most recent common ancestor of both the source and
+		// destination.
+		
+		// Adjust the nodes in between the source and destination node.
+		for (
+				std::size_t nodeIndex = sourceChildIndex;
+				nodeIndex < destChildIndex;
+				nodeIndex += 2 * !inverted - 1) {
+			auto node = sourceParentNode + nodeIndex;
+			node->_dataIndex += 2 * inverted - 1;
+		}
+		
+		return beginData + destDataIndex;
+	}
+	
+	// Moves a piece of data from a child of this node to another one.
+	Octree<Node, Data, Dim>::DataIterator moveDataBelow(
+			Octree<Node, Data, Dim>::DataIterator sourceData,
+			Octree<Node, Data, Dim>::NodeIterator destNode) {
+		// Loop through the children of this node until the one that contains
+		// the data is found.
+		std::size_t dataIndex = sourceData - _octree->_data.begin();
+		auto begin = _octree->_nodes.begin();
+		auto node = begin + (this - &_octree->_nodes.first());
+		for (std::size_t index = 0; index < (1 << Dim); ++index) {
+			auto child = node + _childIndices[index];
+			std::size_t lower = child->_dataIndex;
+			std::size_t upper = lower + child->_dataCount;
+			if (dataIndex >= lower && dataIndex < upper) {
+				return child->moveData(sourceData, destNode);
+			}
+		}
+		return _octree->_data.end();
+	}
+	
+	// Moves a piece of data from the parent of this node to another one.
+	Octree<Node, Data, Dim>::DataIterator moveDataAbove(
+			Octree<Node, Data, Dim>::DataIterator sourceData,
+			Octree<Node, Data, Dim>::NodeIterator destNode) {
+		if (_hasParent) {
+			return _octree->_data.end();
+		}
+		auto begin = _octree->_nodes.begin();
+		auto node = begin + (this - &_octree->_nodes.first());
+		auto parent = node + _parentIndex;
+		return parent->moveData(sourceData, destNode);
 	}
 	
 public:
