@@ -182,7 +182,8 @@ private:
 					childIndex += (1 << dim);
 				}
 			}
-			moveData(data, firstChild + childIndex);
+			auto owner = find(data);
+			owner->moveAt(data, firstChild + childIndex);
 		}
 	}
 	
@@ -214,29 +215,8 @@ private:
 		}
 	}
 	
-	// Adds a piece of data to the octree, starting the search for the correct
-	// node at this node.
-	Octree<Node, Data, Dim>::DataIterator insertData(
-			OctreeData<Data, Dim> const& data) {
-		
-		Vector<Dim> position = data.position();
-		bool contains = contains(position);
-		bool canHoldData =
-			!_hasChildren &&
-			_dataCount < _octree->nodeCapacity;
-		if (contains && canHoldData) {
-			return insertDataAt(octreeData);
-		}
-		else if (contains && !canHoldData) {
-			return insertDataBelow(octreeData);
-		}
-		else {
-			return insertDataAbove(octreeData);
-		}
-	}
-	
-	// Adds a piece of data to this node.
-	Octree<Node, Data, Dim>::DataIterator insertDataAt(
+	// Adds a piece of data to this specific node.
+	Octree<Node, Data, Dim>::DataIterator insertAt(
 			OctreeData<Data, Dim> const& data) {
 		// Add the data to the master list of data in the octree and update
 		// internal variables.
@@ -263,71 +243,9 @@ private:
 		return newData;
 	}
 	
-	// Adds a data point to a child of this node, splitting this node into
-	// subnodes if necessary.
-	Octree<Data, Node, Dim>::DataIterator insertDataBelow(
-			OctreeData<Data, Dim> const& data) {
-		if (!_hasChildren) {
-			createChildren();
-		}
-		
-		auto begin = _octree->_nodes.begin();
-		auto node = begin + (this - &_octree->_nodes.first());
-		
-		// Determine which child the data should be inserted to.
-		Vector<Dim> dataPosition = data.position();
-		Vector<Dim> position = _position;
-		Vector<Dim> midpoint = position + _dimensions / 2;
-		std::size_t childIndex = 0;
-		for (std::size_t dim = 0; dim < Dim; ++dim) {
-			if (dataPosition[dim] >= midpoint[dim]) {
-				childIndex += (1 << Dim);
-			}
-		}
-		
-		// Insert the data into the child.
-		auto child = node + childIndex;
-		return child->insertData(data);
-	}
-	
-	// Adds a data point to a parent of this node.
-	Octree<Data, Node, Dim>::DataIterator insertDataAbove(
-			OctreeData<Data, Dim> const& data) {
-		if (!_hasParent) {
-			// The data is out of range, so don't actually insert it.
-			return _octree->_data.end();
-		}
-		auto begin = _octree->_nodes.begin();
-		auto node = begin + (this - &_octree->_nodes.first());
-		auto parent = node + _parentIndex;
-		return parent->insertData(data);
-	}
-	
-	// Removes a piece of data from the octree, starting the search at this
-	// node.
-	Octree<Node, Data, Dim>::DataIterator eraseData(
-			Octree<Node, Data, Dim>::DataIterator data) {
-		// Check whether the data is contained by this node.
-		std::size_t dataIndex = data - _octree->_data.begin();
-		std::size_t lower = _dataIndex;
-		std::size_t upper = lower + _dataCount;
-		
-		bool contains = dataIndex >= lower && dataIndex < upper;
-		
-		if (contains && !_hasChildren) {
-			return eraseDataAt(data);
-		}
-		else if (contains && _hasChildren) {
-			return eraseDataBelow(data);
-		}
-		else {
-			return eraseDataAbove(data);
-		}
-	}
-	
 	// Removes a piece of data from this node.
-	Octree<Node, Data, Dim>::DataIterator eraseDataAt(
-			Octree<Node, Data, Dim>::DataIterator data) {
+	Octree<Node, Data, Dim>::DataIterator eraseAt(
+			Octree<Node, Data, Dim>::ConstDataIterator data) {
 		// Remove the data from the master octree data vector.
 		auto next = _octree->_data.erase(data);
 		
@@ -352,64 +270,10 @@ private:
 		return next;
 	}
 	
-	// Removes a piece of data from a child of this node.
-	Octree<Node, Data, Dim>::DataIterator eraseDataBelow(
-			Octree<Node, Data, Dim>::DataIterator data) {
-		// Loop through the children of this node until the one that contains
-		// the data is found.
-		std::size_t dataIndex = data - _octree->_data.begin();
-		auto begin = _octree->_nodes.begin();
-		auto node = begin + (this - &_octree->_nodes.first());
-		for (std::size_t index = 0; index < (1 << Dim); ++index) {
-			auto child = node + _childIndices[index];
-			std::size_t lower = child->_dataIndex;
-			std::size_t upper = lower + child->_dataCount;
-			if (dataIndex >= lower && dataIndex < upper) {
-				return child->eraseData(data);
-			}
-		}
-		return _octree->_data.end();
-	}
-	
-	// Removes a piece of data from a parent of this node.
-	Octree<Node, Data, Dim>::DataIterator eraseDataAbove(
-			Octree<Node, Data, Dim>::DataIterator data) {
-		if (_hasParent) {
-			return _octree->_data.end();
-		}
-		auto begin = _octree->_nodes.begin();
-		auto node = begin + (this - &_octree->_nodes.first());
-		auto parent = node + _parentIndex;
-		return parent->eraseData(data);
-	}
-	
-	// Moves a piece of data within the octree from one node to another one,
-	// starting the search at this node.
-	Octree<Node, Data, Dim>::DataIterator moveData(
-			Octree<Node, Data, Dim>::DataIterator sourceData,
-			Octree<Node, Data, Dim>::NodeIterator destNode) {
-		// Check whether the data is contained by this node.
-		std::size_t dataIndex = data - _octree->_data.begin();
-		std::size_t lower = _dataIndex;
-		std::size_t upper = lower + _dataCount;
-		
-		bool contains = dataIndex >= lower && dataIndex < upper;
-		
-		if (contains && !_hasChildren) {
-			return moveDataAt(data);
-		}
-		else if (contains && _hasChildren) {
-			return moveDataBelow(data);
-		}
-		else {
-			return moveDataAbove(data);
-		}
-	}
-	
 	// Moves a piece of data from this node to another one.
-	Octree<Node, Data, Dim>::DataIterator moveDataAt(
-			Octree<Node, Data, Dim>::DataIterator sourceData,
-			Octree<Node, Data, Dim>::NodeIterator destNode) {
+	Octree<Node, Data, Dim>::DataIterator moveAt(
+			Octree<Node, Data, Dim>::ConstDataIterator sourceData,
+			Octree<Node, Data, Dim>::ConstNodeIterator destNode) {
 		// Reinsert the data into the data vector in its new position.
 		auto beginData = _octree->_data.begin();
 		auto destData = beginData + destNode->_dataIndex + destNode->_dataCount;
@@ -466,57 +330,152 @@ private:
 		return beginData + destDataIndex;
 	}
 	
-	// Moves a piece of data from a child of this node to another one.
-	Octree<Node, Data, Dim>::DataIterator moveDataBelow(
-			Octree<Node, Data, Dim>::DataIterator sourceData,
-			Octree<Node, Data, Dim>::NodeIterator destNode) {
-		// Loop through the children of this node until the one that contains
-		// the data is found.
-		std::size_t dataIndex = sourceData - _octree->_data.begin();
-		auto begin = _octree->_nodes.begin();
-		auto node = begin + (this - &_octree->_nodes.first());
-		for (std::size_t index = 0; index < (1 << Dim); ++index) {
-			auto child = node + _childIndices[index];
-			std::size_t lower = child->_dataIndex;
-			std::size_t upper = lower + child->_dataCount;
-			if (dataIndex >= lower && dataIndex < upper) {
-				return child->moveData(sourceData, destNode);
-			}
-		}
-		return _octree->_data.end();
-	}
+public:
 	
-	// Moves a piece of data from the parent of this node to another one.
-	Octree<Node, Data, Dim>::DataIterator moveDataAbove(
-			Octree<Node, Data, Dim>::DataIterator sourceData,
-			Octree<Node, Data, Dim>::NodeIterator destNode) {
-		if (_hasParent) {
+	Octree<Data, Node, Dim>::DataIterator insert(
+			OctreeData<Data, Dim> const& data) {
+		// Find the node with the correct position, and insert the data into
+		// that node.
+		auto node = find(data.position());
+		if (node == _octree->_nodes.end()) {
 			return _octree->_data.end();
 		}
-		auto begin = _octree->_nodes.begin();
-		auto node = begin + (this - &_octree->_nodes.first());
-		auto parent = node + _parentIndex;
-		return parent->moveData(sourceData, destNode);
+		// Create children if the node doesn't have the capacity to store
+		// this data point.
+		if (node->_dataCount + 1 >= _octree->_nodeCapacity) {
+			node->createChildren();
+			node = node->find(data.position());
+		}
+		return node->insertAt(data);
 	}
-	
-public:
 	
 	Octree<Data, Node, Dim>::DataIterator insert(
 			Data const& data,
 			Vector<Dim> const& position) {
-		// Create a new data structure containing the information, determine
-		// whether it should be inserted above or below, then call the
-		// appropriate function.
 		OctreeData<Data, Dim> octreeData(data, position);
-		return insertData(octreeData);
-	}
-	
-	Octree<Data, Node, Dim>::DataIterator erase(
-			Octree<Data, Node, Dim>::DataIterator it) {
+		return insert(octreeData);
 	}
 	
 	Octree<Data, Node, Dim>::DataIterator erase(
 			Octree<Data, Node, Dim>::ConstDataIterator it) {
+		// Find the node that contains this data, and then erase the data from
+		// that node.
+		auto node = find(it);
+		if (node == _octree->_nodes.end()) {
+			return _octree->_data.end();
+		}
+		return node->eraseAt(data);
+	}
+	
+	Octree<Data, Node, Dim>::DataIterator erase(
+			Octree<Data, Node, Dim>::DataIterator it) {
+		Octree<Data, Node, Dim>::ConstDataIterator constIt = it;
+		return eraseData(constIt);
+	}
+	
+	Octree<Data, Node, Dim>::DataIterator move(
+			Octree<Data, Node, Dim>::DataIterator it,
+			Vector<Dim> position) {
+		// Find the source node that contains the data, and the target node
+		// with the correct position.
+		auto source = find(it);
+		auto dest = find(position);
+		if (source == _octree->_nodes.end() || dest == _octree->_nodes.end()) {
+			return _octree->_data.end();
+		}
+		// If the source and the destination are distinct, then check to make
+		// sure that they remain within the node capcity.
+		if (source != dest) {
+			if (source->_hasParent) {
+				auto parent = source + source->_parentIndex;
+				if (parent->_dataCount - 1 < _octree->_nodeCapacity) {
+					parent->destroyChildren();
+					source = parent;
+				}
+			}
+			if (dest->_dataCount + 1 >= _octree->_nodeCapacity) {
+				dest->createChildren();
+				dest = dest->find(position);
+			}
+		}
+		return source->moveAt(dest, it);
+	}
+	
+	Octree<Data, Node, Dim>::NodeIterator find(
+			Vector<Dim> position) {
+		bool contains = contains(position);
+		auto begin = _octree->_nodes.begin();
+		auto node = begin + (this - &_octree->_nodes.first());
+		if (contains && !_hasChildren) {
+			return node;
+		}
+		else if (contains && _hasChildren) {
+			auto child = node + 1;
+			Vector<Dim> midpoint = _position + _dimensions / 2;
+			for (std::size_t dim = 0; dim < Dim; ++dim) {
+				if (position[dim] >= midpoint[dim]) {
+					child += (1 << dim);
+				}
+			}
+			return child->find(position);
+		}
+		else if (_hasParent) {
+			auto parent = node + _parentIndex;
+			return parent->find(position);
+		}
+		return _octree->_nodes.end();
+	}
+	
+	Octree<Data, Node, Dim>::ConstNodeIterator find(
+			Vector<Dim> position) const {
+		return const_cast<OctreeNode<Data, Node, Dim>*>(this)->find(position);
+	}
+	
+	Octree<Data, Node, Dim>::NodeIterator find(
+			Octree<Data, Node, Dim>::ConstDataIterator it) {
+		std::size_t dataIndex = it - _octree->_data.begin();
+		std::size_t lower = _dataIndex;
+		std::size_t upper = lower + _dataCount;
+		
+		bool contains = dataIndex >= lower && dataIndex < upper;
+		
+		auto begin = _octree->_nodes.begin();
+		auto node = begin + (this - &_octree->_nodes.first());
+		
+		if (contains && !_hasChildren) {
+			return node;
+		}
+		else if (contains && _hasChildren) {
+			for (std::size_t index = 0; index < (1 << Dim); ++index) {
+				auto child = node + _childIndices[index];
+				std::size_t lower = child->_dataIndex;
+				std::size_t upper = lower + child->_dataCount;
+				if (dataIndex >= lower && dataIndex < upper) {
+					return child->find(data);
+				}
+			}
+		}
+		else if (_hasParent) {
+			auto parent = node + _parentIndex;
+			return parent->find(it);
+		}
+		return _octree->_nodes.end();
+	}
+	
+	Octree<Data, Node, Dim>::NodeIterator find(
+			Octree<Data, Node, Dim>::DataIterator it) {
+		Octree<Data, Node, Dim>::ConstNodeIterator constIt = it;
+		return find(constIt);
+	}
+	
+	Octree<Data, Node, Dim>::ConstNodeIterator find(
+			Octree<Data, Node, Dim>::ConstDataIterator it) const {
+		return const_cast<OctreeNode<Data, Node, Dim>*>(this)->find(it);
+	}
+	
+	Octree<Data, Node, Dim>::ConstNodeIterator find(
+			Octree<Data, Node, Dim>::DataIterator it) const {
+		return const_cast<OctreeNode<Data, Node, Dim>*>(this)->find(it);
 	}
 	
 	bool contains(Vector<Dim> const& point) {
@@ -533,7 +492,7 @@ public:
 	}
 	
 	bool hasChildren() const {
-		return _children != NULL;
+		return _hasChildren;
 	}
 	
 	bool hasData() const {
