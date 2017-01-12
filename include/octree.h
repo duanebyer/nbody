@@ -3,8 +3,6 @@
 
 #include <algorithm>
 #include <cstddef>
-#include <stdexcept>
-#include <type_traits>
 #include <utility>
 #include <vector>
 
@@ -45,7 +43,7 @@ public:
 		return _data;
 	}
 	
-	Vector<Dim> position() const {
+	Vector<Dim> const& position() const {
 		return _position;
 	}
 	
@@ -100,6 +98,9 @@ private:
 	Vector<Dim> _position;
 	Vector<Dim> _dimensions;
 	
+	// The data stored at the node itself.
+	Node _nodeData;
+	
 	OctreeNode() :
 			_hasChildren(false),
 			_childIndices(),
@@ -111,6 +112,22 @@ private:
 	}
 	
 public:
+	
+	Node& nodeData() {
+		return _nodeData;
+	}
+	
+	Node const& nodeData() const {
+		return _nodeData;
+	}
+	
+	Vector<Dim> const& position() const {
+		return _position;
+	}
+	
+	Vector<Dim> const& dimensions() const {
+		return _dimensions;
+	}
 	
 };
 
@@ -422,7 +439,7 @@ public:
 	
 	
 	
-	DataIterator insert(
+	std::tuple<NodeIterator, DataIterator> insert(
 			ConstNodeIterator start,
 			OctreeData<Data, Dim> const& data) {
 		// Find the node with the correct position, and insert the data into
@@ -437,15 +454,15 @@ public:
 			createChildren(node);
 			node = find(node, data.position());
 		}
-		return insertAt(node, data);
+		return std::make_tuple(node, insertAt(node, data));
 	}
 	
-	DataIterator insert(
+	std::tuple<NodeIterator, DataIterator> insert(
 			OctreeData<Data, Dim> const& data) {
 		return insert(root(), data);
 	}
 	
-	DataIterator insert(
+	std::tuple<NodeIterator, DataIterator> insert(
 			ConstNodeIterator start,
 			Data const& data,
 			Vector<Dim> const& position) {
@@ -453,7 +470,7 @@ public:
 		return insert(start, octreeData);
 	}
 	
-	DataIterator insert(
+	std::tuple<NodeIterator, DataIterator> insert(
 			Data const& data,
 			Vector<Dim> const& position) {
 		return insert(root(), data, position);
@@ -461,7 +478,7 @@ public:
 	
 	
 	
-	DataIterator erase(
+	std::tuple<NodeIterator, DataIterator> erase(
 			ConstNodeIterator start,
 			DataIterator data) {
 		// Find the node that contains this data, and then erase the data from
@@ -470,17 +487,17 @@ public:
 		if (node == _nodes.end()) {
 			return _data.end();
 		}
-		return eraseAt(node, data);
+		return std::make_tuple(node, eraseAt(node, data));
 	}
 	
-	DataIterator erase(
+	std::tuple<NodeIterator, DataIterator> erase(
 			DataIterator data) {
 		return erase(root(), data);
 	}
 	
 	
 	
-	DataIterator move(
+	std::tuple<NodeIterator, NodeIterator, DataIterator> move(
 			ConstNodeIterator start,
 			DataIterator data,
 			Vector<Dim> const& position) {
@@ -506,10 +523,10 @@ public:
 				dest = find(dest, position);
 			}
 		}
-		return moveAt(source, dest, data);
+		return std::make_tuple(source, dest, moveAt(source, dest, data));
 	}
 	
-	DataIterator move(
+	std::tuple<NodeIterator, NodeIterator, DataIterator> move(
 			DataIterator data,
 			Vector<Dim> const& position) {
 		return move(root(), data, position);
