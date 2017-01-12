@@ -14,32 +14,31 @@ namespace nbody {
  * \brief Wraps a piece of data together with a position so that it can be
  * stored at the leaf of an Octree.
  * 
- * \tparam Data the type of data stored at the leaves of the Octree
+ * \tparam Leaf the type of data stored at the leaves of the Octree
  * \tparam Dim the dimension of the space that the Octree is embedded in
  */
-template<typename Data, std::size_t Dim>
-class OctreeData final {
-	template<typename Data, typename Node, std::size_t Num, std::size_t Dim>
+template<typename Leaf, std::size_t Dim>
+class OctreeLeaf final {
+	
+	template<typename Leaf, typename Node, std::size_t Dim>
 	friend class Octree;
-	template<typename Data, typename Node, std::size_t Num, std::size_t Dim>
-	friend class OctreeNode;
 	
 private:
 	
-	Data _data;
+	Leaf _data;
 	Vector<Dim> _position;
 	
-	OctreeData(Data data, Vector<Dim> position) :
+	OctreeLeaf(Leaf data, Vector<Dim> position) :
 			_data(data),
 			_position(position) {
 	}
 	
 public:
 	
-	Data& data() {
+	Leaf& data() {
 		return _data;
 	}
-	Data const& data() const {
+	Leaf const& data() const {
 		return _data;
 	}
 	
@@ -50,12 +49,10 @@ public:
 };
 
 /**
- * \brief Represents an Octree node containing child nodes and possibly data.
+ * \brief Represents an Octree node containing child nodes and possibly leaves.
  * 
  * Each OctreeNode may contain a certain number of children (the number of
- * children depends upon the dimension of the space). If the OctreeNode does
- * not have any children, then it is considered a leaf. Each leaf may store
- * several data points.
+ * children depends upon the dimension of the space).
  * 
  * In addition, each OctreeNode has node data associated with it, regardless of
  * whether it is a leaf or not. This data could contain, for example, the
@@ -63,14 +60,14 @@ public:
  * change is made to the OctreeNode or its children, its internal data is also
  * updated.
  * 
- * \tparam Data the type of data stored at the leaves of the Octree
  * \tparam Node the type of data stored at the nodes of the Octree
  * \tparam Dim the dimension of the space that the Octree is embedded in
  */
-template<typename Data, typename Node, std::size_t Dim>
+template<typename Node, std::size_t Dim>
 class OctreeNode final {
 	
-	friend class Octree<Data, Node, Dim>;
+	template<typename Leaf, typename Node, std::size_t Dim>
+	friend class Octree;
 	
 private:
 	
@@ -88,43 +85,41 @@ private:
 	// Which child # of its parent this node is. (0th child, 1st child, etc).
 	std::size_t _siblingIndex;
 	
-	// The number of data points that this node contains. This includes data
-	// points stored by all descendants of this node.
-	std::size_t _dataCount;
-	// The data points that this node contains are located at this index.
-	std::size_t _dataIndex;
+	// The number of leaves that this node contains. This includes leaves stored
+	// by all descendants of this node.
+	std::size_t _leafCount;
+	// The leaves that this node contains are located at this index.
+	std::size_t _leafIndex;
 	
 	// The section of space that this node encompasses.
 	Vector<Dim> _position;
 	Vector<Dim> _dimensions;
 	
 	// The data stored at the node itself.
-	Node _nodeData;
+	Node _data;
 	
 	OctreeNode() :
 			_hasChildren(false),
 			_childIndices(),
 			_hasParent(false),
-			_dataCount(0),
-			_dataIndex(0),
+			_leafCount(0),
+			_leafIndex(0),
 			_position(),
 			_dimensions() {
 	}
 	
 public:
 	
-	Node& nodeData() {
-		return _nodeData;
+	Node& data() {
+		return _data;
 	}
-	
-	Node const& nodeData() const {
-		return _nodeData;
+	Node const& data() const {
+		return _data;
 	}
 	
 	Vector<Dim> const& position() const {
 		return _position;
 	}
-	
 	Vector<Dim> const& dimensions() const {
 		return _dimensions;
 	}
@@ -135,32 +130,33 @@ public:
  * \brief A data structure that stores positional data in arbitrary
  * dimensional space.
  * 
- * \tparam Data the type of data stored at the leaves of the Octree
+ * \tparam Leaf the type of data stored at the leaves of the Octree
  * \tparam Node the type of data stored at the nodes of the Octree
  * \tparam Dim the dimension of the space that the Octree is embedded in
  */
-template<typename Data, typename Node, std::size_t Dim>
+template<typename Leaf, typename Node, std::size_t Dim>
 class Octree final {
 	
 private:
 	
 	// A list storing all of the nodes of the octree.
-	std::vector<OctreeNode<Dim, Node, Dim> > _nodes;
+	std::vector<OctreeNode<Node, Dim> > _nodes;
 	
-	// A list storing all of the actual data.
-	std::vector<OctreeData<Data, Dim> > _data
+	// A list storing all of the leaves of the octree (it's spelled wrong for
+	// consistancy).
+	std::vector<OctreeLeaf<Leaf, Dim> > _leafs;
 	
-	// The number of data points to store at a single node of the octree.
+	// The number of leaves to store at a single node of the octree.
 	std::size_t _nodeCapacity;
 	
 
-	// Divides a node into a set of subnodes and partitions its data between
+	// Divides a node into a set of subnodes and partitions its leaves between
 	// them.
 	void createChildren(ConstNodeIterator node) {
 		// Create the 2^Dim child nodes inside the parent octree.
 		auto firstChild = _nodes.insert(
 			node, 1 << Dim,
-			OctreeNode<Data, Node, Dim>());
+			OctreeNode<Leaf, Node, Dim>());
 		
 		// Update the node iterator as it has been invalidated.
 		node = firstChild - 1;
@@ -173,7 +169,7 @@ private:
 			child->_hasParent = true;
 			child->_parentIndex = -((std::ptrdiff_t) index + 1);
 			child->_siblingIndex = index;
-			child->_dataIndex = node->_dataIndex + node->_dataCount;
+			child->_leafIndex = node->_leafIndex + node->_leafCount;
 			child->_dimensions = childDimensions;
 			child->_position = node->_position;
 			// Shift the child position depending on which child it is.
@@ -201,22 +197,22 @@ private:
 			}
 		}
 		
-		// Distribute the data of this node to the children.
-		for (std::size_t index = 0; index < _dataCount; ++index) {
-			// Figure out which node the data belongs to.
+		// Distribute the leaves of this node to the children.
+		for (std::size_t index = 0; index < node->_leafCount; ++index) {
+			// Figure out which node the leaf belongs to.
 			std::childIndex = 0;
-			auto data = _data.begin() + node->_dataIndex + index;
-			Vector<Dim> const& position = data->position();
+			auto leaf = _leafs.begin() + node->_leafIndex + index;
+			Vector<Dim> const& position = leaf->position();
 			for (std::size_t dim = 0; dim < Dim; ++dim) {
 				if (position[dim] >= midpoint[dim]) {
 					childIndex += (1 << dim);
 				}
 			}
-			moveAt(node, firstChild + childIndex, data);
+			moveAt(node, firstChild + childIndex, leaf);
 		}
 	}
 	
-	// Destroys all descendants of a node and takes their data into the node.
+	// Destroys all descendants of a node and takes their leaves into the node.
 	void destroyChildren(ConstNodeIterator node) {
 		// Determine how many children, grandchildren, great-grandchildren, ...
 		// of this node.
@@ -240,82 +236,82 @@ private:
 		}
 	}
 	
-	// Adds a piece of data to a specific node.
-	DataIterator insertAt(
+	// Adds a leaf to a specific node.
+	LeafIterator insertAt(
 			ConstNodeIterator node,
-			OctreeData<Data, Dim> const& data) {
-		// Add the data to the master list of data in the octree and update
+			OctreeLeaf<Leaf, Dim> const& leaf) {
+		// Add the leaf to the master list of leaves in the octree and update
 		// internal variables.
-		auto newData = _data.insert(
-			_data.begin + node->_dataIndex + node->_dataCount);
+		auto newLeaf = _leafs.insert(
+			_leafs.begin + node->_leafIndex + node->_leafCount);
 		
-		// Loop through the rest of the nodes and increment their data indices
-		// so that they still refer to the correct location in the data vector.
+		// Loop through the rest of the nodes and increment their leaf indices
+		// so that they still refer to the correct location in the leaf vector.
 		auto currentNode = node;
 		while (++currentNode != _nodes.end()) {
-			++currentNode->_dataIndex;
+			++currentNode->_leafIndex;
 		}
 		
-		// Also loop through all ancestors and increment their data counts.
+		// Also loop through all ancestors and increment their leaf counts.
 		auto parent = node;
 		while (parent->_hasParent) {
-			++parent->_dataCount;
+			++parent->_leafCount;
 			parent += parent->_parentIndex;
 		}
 		
-		return newData;
+		return newLeaf;
 	}
 	
-	// Removes a piece of data from a node.
-	DataIterator eraseAt(
+	// Removes a leaf from a node.
+	LeafIterator eraseAt(
 			ConstNodeIterator node,
-			ConstDataIterator data) {
-		// Remove the data from the master octree data vector.
-		auto next = _data.erase(data);
+			ConstLeafIterator leaf) {
+		// Remove the leaf from the master octree leaf vector.
+		auto next = _leafs.erase(leaf);
 		
-		// Loop through the rest of the nodes and increment their data indices
-		// so that they still refer to the correct location in the data vector.
+		// Loop through the rest of the nodes and increment their leaf indices
+		// so that they still refer to the correct location in the leaf vector.
 		auto currentNode = node;
 		while (++currentNode != _nodes.end()) {
-			--currentNode->_dataIndex;
+			--currentNode->_leafIndex;
 		}
 		
 		// Loop through all of the ancestors of this node and decremement their
-		// data counts.
+		// leaf counts.
 		auto parent = node;
 		while (parent->_hasParent) {
-			--parent->_dataCount;
+			--parent->_leafCount;
 			parent += parent->_parentIndex;
 		}
 		
 		return next;
 	}
 	
-	// Moves a piece of data from this node to another one.
-	DataIterator moveAt(
+	// Moves a leaf from this node to another one.
+	LeafIterator moveAt(
 			ConstNodeIterator sourceNode,
 			ConstNodeIterator destNode,
-			ConstDataIterator sourceData) {
-		// Reinsert the data into the data vector in its new position.
-		auto destData =
-			_data.begin() + destNode->_dataIndex + destNode->_dataCount;
-		bool inverted = sourceData > destData;
-		auto firstData = inverted ? destData : sourceData;
-		auto lastData = inverted ? sourceData : destData;
+			ConstLeafIterator sourceLeaf) {
+		// Reinsert the leaf into the leaf vector in its new position.
+		auto destLeaf =
+			_leafs.begin() + destNode->_leafIndex + destNode->_leafCount;
+		bool inverted = sourceLeaf > destLeaf;
+		auto firstLeaf = inverted ? destLeaf : sourceLeaf;
+		auto lastLeaf = inverted ? sourceLeaf : destLeaf;
 		
-		std::size_t sourceDataIndex = sourceData - beginData;
-		std::size_t destDataIndex = destData - beginData;
+		std::size_t sourceLeafIndex = sourceLeaf - beginLeaf;
+		std::size_t destLeafIndex = destLeaf - beginLeaf;
 		
-		std::rotate(firstData, sourceData + !inverted, lastData + inverted);
+		std::rotate(firstLeaf, sourceLeaf + !inverted, lastLeaf + inverted);
 		
 		// Adjust the ancestors of the source node.
 		auto sourceParentNode = sourceNode;
 		std::size_t sourceChildIndex = 0;
 		while (!(
-				destDataIndex >= sourceParentNode->_dataIndex &&
-				destDataIndex < sourceParentNode->_dataIndex +
-				                sourceParentNode->_dataCount)) {
-			--sourceParentNode->_dataCount;
+				destLeafIndex >= sourceParentNode->_leafIndex &&
+				destLeafIndex < sourceParentNode->_leafIndex +
+				                sourceParentNode->_leafCount)) {
+			--sourceParentNode->_leafCount;
 			std::size_t siblingIndex = sourceParentNode->_siblingIndex;
 			sourceParentNode += sourceParentNode->_parentIndex;
 			sourceChildIndex += sourceParentNode->_childIndices[siblingIndex];
@@ -325,10 +321,10 @@ private:
 		auto destParentNode = destNode;
 		std::size_t destChildIndex = 0;
 		while (!(
-				sourceDataIndex >= destParentNode->_dataIndex &&
-				sourceDataIndex < destParentNode->_dataIndex +
-				                  destParentNode->_dataCount)) {
-			++destParentNode->_dataCount;
+				sourceLeafIndex >= destParentNode->_leafIndex &&
+				sourceLeafIndex < destParentNode->_leafIndex +
+				                  destParentNode->_leafCount)) {
+			++destParentNode->_leafCount;
 			std::size_t siblingIndex = destParentNode->_siblingIndex;
 			destParentNode += destParentNode->_parentIndex;
 			destChildIndex += destParentNode->_childIndices[siblingIndex];
@@ -345,24 +341,24 @@ private:
 				nodeIndex < destChildIndex;
 				nodeIndex += invertedSign) {
 			auto node = sourceParentNode + nodeIndex;
-			node->_dataIndex -= invertedSign;
+			node->_leafIndex -= invertedSign;
 		}
 		
-		return beginData + destDataIndex;
+		return beginLeaf + destLeafIndex;
 	}
 	
 public:
 	
 	using NodeIterator = decltype(_nodes)::iterator;
 	using ConstNodeIterator = decltype(_nodes)::const_iterator;
-	using DataIterator = decltype(_data)::iterator;
-	using ConstDataIterator = decltype(_data)::const_iterator;
+	using LeafIterator = decltype(_leafs)::iterator;
+	using ConstLeafIterator = decltype(_leafs)::const_iterator;
 	
 	
 	
 	Octree(Vector<Dim> position, Vector<Dim> dimensions) :
 			_nodes(),
-			_data(),
+			_leafs(),
 			_nodeCapacity(1) {
 	}
 	
@@ -397,7 +393,7 @@ public:
 		}
 	}
 	ConstNodeIterator parent(ConstNodeIterator node) const {
-		return const_cast<Octree<Data, Node, Dim>*>(this)->parent(node);
+		return const_cast<Octree<Leaf, Node, Dim>*>(this)->parent(node);
 	}
 	NodeIterator child(ConstNodeIterator node, std::size_t index) {
 		if (!node->_hasChildren) {
@@ -408,128 +404,128 @@ public:
 		}
 	}
 	ConstNodeIterator child(ConstNodeIterator node, std::size_t index) const {
-		return const_cast<Octree<Data, Node, Dim>*>(this)->child(node, index);
+		return const_cast<Octree<Leaf, Node, Dim>*>(this)->child(node, index);
 	}
 	
-	DataIterator dataBegin() {
-		return _data.begin();
+	LeafIterator leafBegin() {
+		return _leafs.begin();
 	}
-	ConstDataIterator dataBegin() const {
-		return _data.begin();
+	ConstLeafIterator leafBegin() const {
+		return _leafs.begin();
 	}
-	DataIterator dataEnd() {
-		return _data.end();
+	LeafIterator leafEnd() {
+		return _leafs.end();
 	}
-	ConstDataIterator dataEnd() const {
-		return _data.end();
-	}
-	
-	DataIterator dataBegin(ConstNodeIterator node) {
-		return _data.begin() + node->_dataIndex;
-	}
-	ConstDataIterator dataBegin(ConstNodeIterator node) const {
-		return _data.begin() + node->_dataIndex;
-	}
-	DataIterator dataEnd(ConstNodeIterator node) {
-		return _data.begin() + node->_dataIndex + node->_dataCount;
-	}
-	ConstDataIterator dataEnd(ConstNodeIterator node) const {
-		return _data.begin() + node->_dataIndex + node->_dataCount;
+	ConstLeafIterator leafEnd() const {
+		return _leafs.end();
 	}
 	
+	LeafIterator leafBegin(ConstNodeIterator node) {
+		return _leafs.begin() + node->_leafIndex;
+	}
+	ConstLeafIterator leafBegin(ConstNodeIterator node) const {
+		return _leafs.begin() + node->_leafIndex;
+	}
+	LeafIterator leafEnd(ConstNodeIterator node) {
+		return _leafs.begin() + node->_leafIndex + node->_leafCount;
+	}
+	ConstLeafIterator leafEnd(ConstNodeIterator node) const {
+		return _leafs.begin() + node->_leafIndex + node->_leafCount;
+	}
 	
 	
-	std::tuple<NodeIterator, DataIterator> insert(
+	
+	std::tuple<NodeIterator, LeafIterator> insert(
 			ConstNodeIterator start,
-			OctreeData<Data, Dim> const& data) {
-		// Find the node with the correct position, and insert the data into
+			OctreeLeaf<Leaf, Dim> const& leaf) {
+		// Find the node with the correct position, and insert the leaf into
 		// that node.
-		auto node = find(start, data.position());
+		auto node = find(start, leaf.position());
 		if (node == _nodes.end()) {
-			return _data.end();
+			return _leafs.end();
 		}
 		// Create children if the node doesn't have the capacity to store
-		// this data point.
-		if (node->_dataCount + 1 >= _nodeCapacity) {
+		// this leaf.
+		if (node->_leafCount + 1 >= _nodeCapacity) {
 			createChildren(node);
-			node = find(node, data.position());
+			node = find(node, leaf.position());
 		}
-		return std::make_tuple(node, insertAt(node, data));
+		return std::make_tuple(node, insertAt(node, leaf));
 	}
 	
-	std::tuple<NodeIterator, DataIterator> insert(
-			OctreeData<Data, Dim> const& data) {
-		return insert(root(), data);
+	std::tuple<NodeIterator, LeafIterator> insert(
+			OctreeLeaf<Leaf, Dim> const& leaf) {
+		return insert(root(), leaf);
 	}
 	
-	std::tuple<NodeIterator, DataIterator> insert(
+	std::tuple<NodeIterator, LeafIterator> insert(
 			ConstNodeIterator start,
-			Data const& data,
+			Leaf const& data,
 			Vector<Dim> const& position) {
-		OctreeData<Data, Dim> octreeData(data, position);
-		return insert(start, octreeData);
+		OctreeLeaf<Leaf, Dim> leaf(data, position);
+		return insert(start, leaf);
 	}
 	
-	std::tuple<NodeIterator, DataIterator> insert(
-			Data const& data,
+	std::tuple<NodeIterator, LeafIterator> insert(
+			Leaf const& data,
 			Vector<Dim> const& position) {
 		return insert(root(), data, position);
 	}
 	
 	
 	
-	std::tuple<NodeIterator, DataIterator> erase(
+	std::tuple<NodeIterator, LeafIterator> erase(
 			ConstNodeIterator start,
-			DataIterator data) {
-		// Find the node that contains this data, and then erase the data from
+			LeafIterator leaf) {
+		// Find the node that contains this leaf, and then erase the leaf from
 		// that node.
-		auto node = find(start, data);
+		auto node = find(start, leaf);
 		if (node == _nodes.end()) {
-			return _data.end();
+			return _leafs.end();
 		}
-		return std::make_tuple(node, eraseAt(node, data));
+		return std::make_tuple(node, eraseAt(node, leaf));
 	}
 	
-	std::tuple<NodeIterator, DataIterator> erase(
-			DataIterator data) {
-		return erase(root(), data);
+	std::tuple<NodeIterator, LeafIterator> erase(
+			LeafIterator leaf) {
+		return erase(root(), leaf);
 	}
 	
 	
 	
-	std::tuple<NodeIterator, NodeIterator, DataIterator> move(
+	std::tuple<NodeIterator, NodeIterator, LeafIterator> move(
 			ConstNodeIterator start,
-			DataIterator data,
+			LeafIterator leaf,
 			Vector<Dim> const& position) {
-		// Find the source node that contains the data, and the target node
+		// Find the source node that contains the leaf, and the target node
 		// with the correct position.
-		auto source = find(start, data);
+		auto source = find(start, leaf);
 		auto dest = find(start, position);
 		if (source == _nodes.end() || dest == _nodes.end()) {
-			return _data.end();
+			return _leafs.end();
 		}
 		// If the source and the destination are distinct, then check to make
 		// sure that they remain within the node capcity.
 		if (source != dest) {
 			if (source->_hasParent) {
 				auto parent = source + source->_parentIndex;
-				if (parent->_dataCount - 1 < _nodeCapacity) {
+				if (parent->_leafCount - 1 < _nodeCapacity) {
 					destroyChildren(parent);
 					source = parent;
 				}
 			}
-			if (dest->_dataCount + 1 >= _octree->_nodeCapacity) {
+			if (dest->_leafCount + 1 >= _octree->_nodeCapacity) {
 				createChildren(dest);
 				dest = find(dest, position);
 			}
 		}
-		return std::make_tuple(source, dest, moveAt(source, dest, data));
+		return std::make_tuple(source, dest, moveAt(source, dest, leaf));
 	}
 	
-	std::tuple<NodeIterator, NodeIterator, DataIterator> move(
-			DataIterator data,
+	std::tuple<NodeIterator, NodeIterator, LeafIterator> move(
+			LeafIterator leaf,
 			Vector<Dim> const& position) {
-		return move(root(), data, position);
+		return move(root(), leaf, position);
 	}
 	
 	
@@ -582,7 +578,7 @@ public:
 	ConstNodeIterator find(
 			ConstNodeIterator start,
 			Vector<Dim> const& position) const {
-		return const_cast<Octree<Data, Node, Dim>*>(this)->find(
+		return const_cast<Octree<Leaf, Node, Dim>*>(this)->find(
 			start, position);
 	}
 	
@@ -595,14 +591,14 @@ public:
 	
 	NodeIterator find(
 			ConstNodeIterator start,
-			ConstDataIterator data) {
+			ConstLeafIterator leaf) {
 		auto node = start;
 		
-		std::size_t dataIndex = data - _data.begin();
-		std::size_t lower = node->_dataIndex;
-		std::size_t upper = lower + node->_dataCount;
+		std::size_t leafIndex = leaf - _leafs.begin();
+		std::size_t lower = node->_leafIndex;
+		std::size_t upper = lower + node->_leafCount;
 		
-		bool contains = dataIndex >= lower && dataIndex < upper;
+		bool contains = leafIndex >= lower && leafIndex < upper;
 		
 		if (contains && !node->_hasChildren) {
 			return node;
@@ -610,35 +606,35 @@ public:
 		else if (contains && node->_hasChildren) {
 			for (std::size_t index = 0; index < (1 << Dim); ++index) {
 				auto child = node + node->_childIndices[index];
-				std::size_t lower = child->_dataIndex;
-				std::size_t upper = lower + child->_dataCount;
-				if (dataIndex >= lower && dataIndex < upper) {
-					return find(child, data);
+				std::size_t lower = child->_leafIndex;
+				std::size_t upper = lower + child->_leafCount;
+				if (leafIndex >= lower && leafIndex < upper) {
+					return find(child, leaf);
 				}
 			}
 		}
 		else if (node->_hasParent) {
 			auto parent = node + node->_parentIndex;
-			return find(parent, data);
+			return find(parent, leaf);
 		}
 		return _nodes.end();
 	}
 	
 	NodeIterator find(
-			ConstDataIterator data) {
-		return find(root(), data);
+			ConstLeafIterator leaf) {
+		return find(root(), leaf);
 	}
 	
 	ConstNodeIterator find(
 			ConstNodeIterator start,
-			ConstDataIterator data) const {
-		return const_cast<Octree<Data, Node, Dim>*>(this)->find(
-			start, data);
+			ConstLeafIterator leaf) const {
+		return const_cast<Octree<Leaf, Node, Dim>*>(this)->find(
+			start, leaf);
 	}
 	
 	ConstNodeIterator find(
-			ConstDataIterator data) const {
-		return find(root(), data);
+			ConstLeafIterator leaf) const {
+		return find(root(), leaf);
 	}
 	
 };
