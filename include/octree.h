@@ -2,6 +2,7 @@
 #define __NBODY_OCTREE_H_
 
 #include <algorithm>
+#include <climits>
 #include <cstddef>
 #include <utility>
 #include <vector>
@@ -11,8 +12,11 @@
 namespace nbody {
 
 /**
- * \brief Wraps a piece of data together with a position so that it can be
- * stored at the leaf of an Octree.
+ * \brief Represents a piece of data stored at the leaf of an Octree.
+ * 
+ * This class is a simple wrapper for the data as well as the position at which
+ * the data is stored. More complex operations can be performed using the Octree
+ * class.
  * 
  * \tparam Leaf the type of data stored at the leaves of the Octree
  * \tparam Dim the dimension of the space that the Octree is embedded in
@@ -35,12 +39,18 @@ private:
 	
 public:
 	
+	///@{
+	/**
+	 * \brief Provides access to the (mutable) data contained at this leaf.
+	 * \returns a reference to the data
+	 */
 	Leaf& data() {
 		return _data;
 	}
 	Leaf const& data() const {
 		return _data;
 	}
+	///@}
 	
 	Vector<Dim> const& position() const {
 		return _position;
@@ -49,16 +59,11 @@ public:
 };
 
 /**
- * \brief Represents an Octree node containing child nodes and possibly leaves.
+ * \brief Represents an internal node of an Octree.
  * 
- * Each OctreeNode may contain a certain number of children (the number of
- * children depends upon the dimension of the space).
- * 
- * In addition, each OctreeNode has node data associated with it, regardless of
- * whether it is a leaf or not. This data could contain, for example, the
- * center of mass of all of the children of the OctreeNode. Every time a
- * change is made to the OctreeNode or its children, its internal data is also
- * updated.
+ * This class is a simple wrapper for the data as well as the spatial region
+ * encompassed by this node. More complex operations can be performed using the
+ * Octree class.
  * 
  * \tparam Node the type of data stored at the nodes of the Octree
  * \tparam Dim the dimension of the space that the Octree is embedded in
@@ -71,7 +76,7 @@ class OctreeNode final {
 	
 private:
 	
-	// Whether this node has any children currently.
+	// Whether this node has any children.
 	bool _hasChildren;
 	// The indices of the children of this node, stored relative to the index
 	// of this node. The last entry points to the next sibling of this node,
@@ -88,7 +93,8 @@ private:
 	// The number of leaves that this node contains. This includes leaves stored
 	// by all descendants of this node.
 	std::size_t _leafCount;
-	// The leaves that this node contains are located at this index.
+	// The index within the octree's leaf array that this node's leaves are
+	// located at.
 	std::size_t _leafIndex;
 	
 	// The section of space that this node encompasses.
@@ -102,20 +108,29 @@ private:
 			_hasChildren(false),
 			_childIndices(),
 			_hasParent(false),
+			_parentIndex(),
+			_siblingIndex(),
 			_leafCount(0),
 			_leafIndex(0),
 			_position(),
-			_dimensions() {
+			_dimensions(),
+			_data() {
 	}
 	
 public:
 	
+	///@{
+	/**
+	 * \brief Provides access to the (mutable) data contained at this node.
+	 * \returns a reference to the data
+	 */
 	Node& data() {
 		return _data;
 	}
 	Node const& data() const {
 		return _data;
 	}
+	///@}
 	
 	Vector<Dim> const& position() const {
 		return _position;
@@ -127,8 +142,23 @@ public:
 };
 
 /**
- * \brief A data structure that stores positional data in arbitrary
- * dimensional space.
+ * \brief A data structure that stores spatial data in arbitrary dimensional
+ * space.
+ * 
+ * An Octree consists of a set of OctreeNode%s. Each node contains a
+ * hyper-rectangle that defines the section of space that it partitions. It may
+ * also contain a set of child nodes that evenly cover the hyper-rectangle. Each
+ * node also has data associated with it.
+ * 
+ * In addition, an Octree contains a set of OctreeLeaf%s. Each leaf represents
+ * a single point. Similarly to the nodes, each leaf also has data associated
+ * with it.
+ * 
+ * Whenever a leaf is added to the Octree, the unique childfree node that
+ * contains the leaf is queried. If it now contains more leaves than its
+ * capacity, then the node creates new child nodes to store the leaves. New nodes
+ * cannot be manually added to the Octree (nodes are always associated with
+ * leaves).
  * 
  * \tparam Leaf the type of data stored at the leaves of the Octree
  * \tparam Node the type of data stored at the nodes of the Octree
@@ -356,10 +386,17 @@ public:
 	
 	
 	
-	Octree(Vector<Dim> position, Vector<Dim> dimensions) :
+	Octree(
+			Vector<Dim> position,
+			Vector<Dim> dimensions,
+			std::size_t nodeCapacity = 1) :
 			_nodes(),
 			_leafs(),
 			_nodeCapacity(1) {
+		OctreeNode<Node, Dim> root;
+		root._position = position;
+		root._dimensions = dimensions;
+		_nodes.push_back(root);
 	}
 	
 	
