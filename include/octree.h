@@ -52,6 +52,9 @@ public:
 	}
 	///@}
 	
+	/**
+	 * \brief Gets the position of the leaf.
+	 */
 	Vector<Dim> const& position() const {
 		return _position;
 	}
@@ -136,9 +139,23 @@ public:
 	}
 	///@}
 	
+	/**
+	 * \brief Gets the position of the "upper-left" corner of the node.
+	 * 
+	 * This method will always return the corner that has the smallest coordinate
+	 * values. Any point contained within this node is guaranteed to have
+	 * coordinate values larger or equal to this point.
+	 */
 	Vector<Dim> const& position() const {
 		return _position;
 	}
+	
+	/**
+	 * \brief Gets a Vector representing the size of the node.
+	 * 
+	 * Note that a node is not required to be a hyper-cube: it can (in general)
+	 * be any hyper-rectangle.
+	 */
 	Vector<Dim> const& dimensions() const {
 		return _dimensions;
 	}
@@ -149,20 +166,22 @@ public:
  * \brief A data structure that stores spatial data in arbitrary dimensional
  * space.
  * 
- * An Octree consists of a set of OctreeNode%s. Each node contains a
- * hyper-rectangle that defines the section of space that it partitions. It may
- * also contain a set of child nodes that evenly cover the hyper-rectangle. Each
- * node also has data associated with it.
+ * This class is a fairly standard implementation of an octree that stores data
+ * at discrete points. In addition, this class allows for data to be stored at
+ * the nodes of the octree (for example, the center of mass of all of the data
+ * points contained within a node).
  * 
- * In addition, an Octree contains a set of OctreeLeaf%s. Each leaf represents
- * a single point. Similarly to the nodes, each leaf also has data associated
- * with it.
+ * The OctreeLeaf class is used to contain the discrete data points contained
+ * within the octree. The OctreeNode class contains the data associated with the
+ * nodes themselves. In many ways, the Octree class can be thought of as a
+ * container of both OctreeLeaf%s and OctreeNode%s, although only OctreeLeaf%s
+ * can be directly added to the octree.
  * 
- * Whenever a leaf is added to the Octree, the unique childfree node that
- * contains the leaf is queried. If it now contains more leaves than its
- * capacity, then the node creates new child nodes to store the leaves. New nodes
- * cannot be manually added to the Octree (nodes are always associated with
- * leaves).
+ * When an octree is created, it's possible to specify the maximum number of
+ * leaves that can be contained by a node, as well as the maximum depth that the
+ * octree can reach. In addition, it's possible to choose whether the octree
+ * will automatically readjust its nodes when one of the nodes has too many
+ * children, or whether the adjustments should be performed manually.
  * 
  * \tparam Leaf the type of data stored at the leaves of the Octree
  * \tparam Node the type of data stored at the nodes of the Octree
@@ -181,16 +200,16 @@ private:
 	std::vector<OctreeLeaf<Leaf, Dim> > _leafs;
 	
 	// The number of leaves to store at a single node of the octree.
-	std::size_t _nodeCapacity;
+	std::size_t const _nodeCapacity;
 	
 	// The maximum depth of the octree.
-	std::size_t _maxDepth;
+	std::size_t const _maxDepth;
 	
 	// Whether the tree should be automatically readjust itself so that each
 	// node has less leaves than the node capacity, as well as having as few
 	// children as possible. If this is false, then the adjust() method has to
 	// be called to force an adjustment.
-	bool _adjust;
+	bool const _adjust;
 	
 	
 	
@@ -408,13 +427,35 @@ private:
 	
 public:
 	
+	///@{
+	/**
+	 * \brief Depth-first iterator over all of the OctreeNode%s contained in
+	 * the octree.
+	 */
 	using NodeIterator = decltype(_nodes)::iterator;
 	using ConstNodeIterator = decltype(_nodes)::const_iterator;
+	///@}
+	///@{
+	/**
+	 * \brief Depth-first iterator over all of the OctreeLeaf%s contained in
+	 * the octree.
+	 */
 	using LeafIterator = decltype(_leafs)::iterator;
 	using ConstLeafIterator = decltype(_leafs)::const_iterator;
+	///@}
 	
 	
 	
+	/**
+	 * \brief Constructs a new, empty Octree with a maximum size.
+	 * 
+	 * \param position the location of the "upper-left" corner of the region of
+	 *                 space that the octree covers
+	 * \param dimensions the size of the region of space that the octree covers
+	 * \param nodeCapacity the number of leafs that can be stored in one node
+	 * \param maxDepth the maximum number of generations of nodes
+	 * \param adjust whether the octree should automatically readjust its nodes
+	 */
 	Octree(
 			Vector<Dim> position,
 			Vector<Dim> dimensions,
@@ -434,13 +475,25 @@ public:
 	
 	
 	
+	///@{
+	/**
+	 * \brief Gets an iterator to the root node of the octree.
+	 * 
+	 * The root node is the only node that has no parent. Its dimensions are the
+	 * same as the dimensions of the whole octree.
+	 */
 	NodeIterator root() {
 		return _nodes.begin();
 	}
 	ConstNodeIterator root() const {
 		return _nodes.begin();
 	}
+	///@}
 	
+	///@{
+	/**
+	 * \brief Standard iterator method for depth-first iteration order.
+	 */
 	NodeIterator nodeBegin() {
 		return _nodes.begin();
 	}
@@ -453,10 +506,15 @@ public:
 	ConstNodeIterator nodeEnd() const {
 		return _nodes.end();
 	}
+	///@}
 	
-	bool hasParent(ConstNodeIterator node) {
-		return parent(node) != _nodes.end();
-	}
+	///@{
+	/**
+	 * \brief Gets an iterator to the parent of a node.
+	 * 
+	 * If the node has no parent (because it is the root), then the past-the-end
+	 * iterator is returned.
+	 */
 	NodeIterator parent(ConstNodeIterator node) {
 		if (!node->_hasParent) {
 			return _nodes.end();
@@ -468,7 +526,14 @@ public:
 	ConstNodeIterator parent(ConstNodeIterator node) const {
 		return const_cast<Octree<Leaf, Node, Dim>*>(this)->parent(node);
 	}
+	///@}
 	
+	///@{
+	/**
+	 * \brief Gets an iterator to a child of a node.
+	 * 
+	 * If the node has no children, then the past-the-end iterator is returned.
+	 */
 	NodeIterator child(ConstNodeIterator node, std::size_t index) {
 		if (!node->_hasChildren) {
 			return _nodes.end();
@@ -480,7 +545,12 @@ public:
 	ConstNodeIterator child(ConstNodeIterator node, std::size_t index) const {
 		return const_cast<Octree<Leaf, Node, Dim>*>(this)->child(node, index);
 	}
+	///@}
 	
+	///@{
+	/**
+	 * \brief Standard iterator method for depth-first iteration order.
+	 */
 	LeafIterator leafBegin() {
 		return _leafs.begin();
 	}
@@ -493,7 +563,13 @@ public:
 	ConstLeafIterator leafEnd() const {
 		return _leafs.end();
 	}
+	///@}
 	
+	///@{
+	/**
+	 * \brief Provides depth-first iteration bounds for all of the leaves
+	 * contained within a specific node (or its children).
+	 */
 	LeafIterator leafBegin(ConstNodeIterator node) {
 		return _leafs.begin() + node->_leafIndex;
 	}
@@ -506,20 +582,38 @@ public:
 	ConstLeafIterator leafEnd(ConstNodeIterator node) const {
 		return _leafs.begin() + node->_leafIndex + node->_leafCount;
 	}
+	///@}
 	
 	
 	
+	///@{
+	/**
+	 * \brief Creates and destroys nodes so that the octree has the minimum
+	 * necessary nodes to store all of the leafs.
+	 * 
+	 * This method can invalidate both NodeIterator%s and LeafIterator%s. It
+	 * works by taking all nodes that have more leaves than their capacity and
+	 * splitting them into child nodes to store the leaves. It also merges
+	 * unnecessary nodes with their siblings.
+	 * 
+	 * \param node the node which will be adjusted
+	 * 
+	 * \return whether any changes were actually made
+	 */
 	bool adjust(ConstNodeIterator node) {
 		bool result = false;
+		// If the node doesn't have children but should, then make them.
 		if (!node->_hasChildren && !canHoldLeafs(node, 0)) {
 			createChildren(node);
 			result = true;
 		}
+		// If the node does have children but shouldn't, then remove them.
 		else if (node->_hasChildren && canHoldLeafs(node, 0)) {
 			destroyChildren(node);
 			result = true;
 		}
-		else if (node->_hasChildren) {
+		// Then, adjust all of this node's children as well.
+		if (node->_hasChildren) {
 			auto begin = _nodes.begin();
 			for (std::size_t index = 0; index < (1 << Dim); ++index) {
 				auto child = node + node->_childIndices[index];
@@ -530,13 +624,39 @@ public:
 		return result;
 	}
 	
+	bool adjust() {
+		return adjust(root());
+	}
+	///@}
 	
 	
+	
+	///@{
+	/**
+	 * \brief Adds a new leaf to the octree.
+	 * 
+	 * The octree will search for the appropriate node to add the leaf to
+	 * starting at the optional node passed to this method. If no node was
+	 * provided, then the search starts at the root. If the leaf could not be
+	 * added (for instance, the position is out of range of the octree), then
+	 * the past-the-end iterator will be returned.
+	 * 
+	 * This method may invalidate both node iterators and leaf iterators.
+	 * 
+	 * \param start a starting guess as to where the leaf should be inserted
+	 * \param data the actual data that will be stored at the leaf
+	 * \param position the position of the node
+	 * 
+	 * \return a tuple containing the node iterator where the leaf was added,
+	 *         and a leaf iterator to the newly created leaf
+	 */
 	std::tuple<NodeIterator, LeafIterator> insert(
 			ConstNodeIterator start,
-			OctreeLeaf<Leaf, Dim> const& leaf) {
+			Leaf const& data,
+			Vector<Dim> const& position) {
 		// Find the node with the correct position, and insert the leaf into
 		// that node.
+		OctreeLeaf<Leaf, Dim> leaf(data, position);
 		auto node = find(start, leaf.position());
 		if (node == _nodes.end()) {
 			return _leafs.end();
@@ -551,26 +671,30 @@ public:
 	}
 	
 	std::tuple<NodeIterator, LeafIterator> insert(
-			OctreeLeaf<Leaf, Dim> const& leaf) {
-		return insert(root(), leaf);
-	}
-	
-	std::tuple<NodeIterator, LeafIterator> insert(
-			ConstNodeIterator start,
-			Leaf const& data,
-			Vector<Dim> const& position) {
-		OctreeLeaf<Leaf, Dim> leaf(data, position);
-		return insert(start, leaf);
-	}
-	
-	std::tuple<NodeIterator, LeafIterator> insert(
 			Leaf const& data,
 			Vector<Dim> const& position) {
 		return insert(root(), data, position);
 	}
+	///@}
 	
 	
 	
+	///@{
+	/**
+	 * \brief Removes a leaf from the octree.
+	 * 
+	 * The octree will search for the node which contains the leaf, starting at
+	 * the optional node passed to this method. If no node was provided, then
+	 * the search starts at the root.
+	 * 
+	 * This method may invalidate both node iterators and leaf iterators.
+	 * 
+	 * \param start a starting guess as to where the leaf should be removed from
+	 * \param leaf an iterator to the leaf that should be removed
+	 * 
+	 * \return a tuple containing the node iterator that the leaf was removed
+	 *         from, and the leaf iterator following the removed leaf
+	 */
 	std::tuple<NodeIterator, LeafIterator> erase(
 			ConstNodeIterator start,
 			LeafIterator leaf) {
@@ -596,6 +720,7 @@ public:
 			LeafIterator leaf) {
 		return erase(root(), leaf);
 	}
+	///@}
 	
 	
 	
