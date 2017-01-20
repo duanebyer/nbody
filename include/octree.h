@@ -83,6 +83,9 @@ private:
 	// The octree that contains this node.
 	Octree<Data, Node, Num, Dim> const* _octree;
 	
+	// The depth of this node within the octree (0 for root, and so on).
+	std::size_t _depth;
+	
 	// Whether this node has any children currently.
 	bool _hasChildren;
 	// The indices of the children of this node, stored relative to the index
@@ -109,6 +112,7 @@ private:
 	
 	OctreeNode(Octree<Data, Node, Dim> const* octree) :
 			_octree(octree),
+			_depth(0),
 			_hasChildren(false),
 			_childIndices(),
 			_hasParent(false),
@@ -121,8 +125,19 @@ private:
 	OctreeNode(OctreeNode<Data, Node, Dim> const&) = delete;
 	void operator=(OctreeNode<Data, Node, Dim> const&) = delete;
 	
+	// Returns whether the node can accomodate a change in the number of data
+	// points by 'n' and still hold all of the data points without children.
+	bool canHoldData(std::ptrdiff_t n = 0) const {
+		// If the depth of the node is larger than the max, then it has
+		// infinite capacity.
+		return
+			_dataCount + n < _octree->_nodeCapacity ||
+			_depth >= _octree->_maxDepth;
+	}
+	
 	// Divides this node into a set of subnodes and partitions its data between
-	// them.
+	// them. This function may reorganize the data vector (some data iterators
+	// may become invalid).
 	void createChildren() {
 		// Create the 2^Dim child nodes inside the parent octree.
 		auto begin = _octree->_nodes.begin();
@@ -140,6 +155,7 @@ private:
 		Vector<Dim> midpoint = _position + childDimensions;
 		auto child = firstChild;
 		for (std::size_t index = 0; index < (1 << Dim); ++index) {
+			child->_depth = _depth + 1;
 			child->_hasParent = true;
 			child->_parentIndex = -((std::ptrdiff_t) index + 1);
 			child->_siblingIndex = index;
@@ -188,7 +204,8 @@ private:
 	}
 	
 	// Destroys all descendants of this node and takes their data into this
-	// node.
+	// node. This function will not reorganize the data vector (all data
+	// iterators will remain valid).
 	void destroyChildren() {
 		// Determine how many children, grandchildren, great-grandchildren, ...
 		// of this node.
@@ -332,6 +349,23 @@ private:
 	
 public:
 	
+	bool adjust() {
+		if (!_hasChildren && !canHoldData(0)) {
+			createChildren();
+		}
+		else if (_hasChildren && canHoldData(0)) {
+			destroyChildren();
+		}
+		else if (_hasChildren) {
+			auto begin = _octree->_nodes.begin();
+			auto node = begin + (this - &_octree->_nodes.first());
+			for (std::size_t index = 0; index < (1 << Dim); ++index) {
+				auto child = node + _childIndices[index];
+				child->adjust();
+			}
+		}
+	}
+	
 	Octree<Data, Node, Dim>::DataIterator insert(
 			OctreeData<Data, Dim> const& data) {
 		// Find the node with the correct position, and insert the data into
@@ -342,7 +376,7 @@ public:
 		}
 		// Create children if the node doesn't have the capacity to store
 		// this data point.
-		if (node->_dataCount + 1 >= _octree->_nodeCapacity) {
+		if (_octree->_adjust && !canHoldData(+1)) {
 			node->createChildren();
 			node = node->find(data.position());
 		}
@@ -363,6 +397,13 @@ public:
 		auto node = find(it);
 		if (node == _octree->_nodes.end()) {
 			return _octree->_data.end();
+		}
+		if (_octree->_adjust && node->_hasParent) {
+			auto parent = node + node->_parentIndex;
+			if (parent->canHoldData(-1)) {
+				parent->destroyChildren();
+				node = parent;
+			}
 		}
 		return node->eraseAt(data);
 	}
@@ -385,15 +426,15 @@ public:
 		}
 		// If the source and the destination are distinct, then check to make
 		// sure that they remain within the node capcity.
-		if (source != dest) {
+		if (_octree->_adjust && source != dest) {
 			if (source->_hasParent) {
 				auto parent = source + source->_parentIndex;
-				if (parent->_dataCount - 1 < _octree->_nodeCapacity) {
+				if (parent->canHoldData(-1)) {
 					parent->destroyChildren();
 					source = parent;
 				}
 			}
-			if (dest->_dataCount + 1 >= _octree->_nodeCapacity) {
+			if (!dest->canHoldData(+1)) {
 				dest->createChildren();
 				dest = dest->find(position);
 			}
@@ -495,19 +536,39 @@ public:
 		return _hasChildren;
 	}
 	
-	bool hasData() const {
-		return _hasData;
-	}
-	
 	bool hasParent() const {
-		return _parent != NULL;
+		return _hasParent;
 	}
 	
-	OctreeNode<T, Dim>& parent() {
-		return *_parent;
+	Octree<Data, Node, Dim>::NodeIterator iterator() {
+		auto begin = _octree->_nodes.begin();
+		auto node = begin + (this - &_octree->_nodes.first());
+		return node;
 	}
-	OctreeNode<T, Dim> const& parent() const {
-		return *_parent;
+	
+	Octree<Data, Node, Dim>::ConstNodeIterator iterator() const {
+		auto begin = _octree->_nodes.begin();
+		auto node = begin + (this - &_octree->_nodes.first());
+		return node;
+	}
+	
+	Octree<Data, Node, Dim>::NodeIterator parent() {
+		auto node = iterator();
+		if (!node->_hasParent) {
+			return _octree->_nodes.end();
+		}
+		else {
+			return node + node->_parentIndex;
+		}
+	}
+	Octree<Data, Node, Dim>::ConstNodeIterator parent() const {
+		auto node = iterator();
+		if (!node->_hasParent) {
+			return _octree->_nodes.end();
+		}
+		else {
+			return node + node->_parentIndex;
+		}
 	}
 	
 	OctreeNode<T, Dim>* children() {
@@ -555,6 +616,14 @@ private:
 	
 	// The number of data points to store at a single node of the octree.
 	std::size_t _nodeCapacity;
+	
+	// The maximum depth of the octree.
+	std::size_t _maxDepth;
+	
+	// Whether the tree should be automatically readjust itself so that each
+	// node has less data than the node capacity. If this is false, then the
+	// adjust() method has to be called to force an adjustment.
+	bool _adjust;
 	
 public:
 	
