@@ -52,16 +52,16 @@ public:
 	 * \brief Depth-first iterator over all of the Node%s contained in the
 	 * Octree.
 	 */
-	using NodeIterator = decltype(_nodes)::iterator;
-	using ConstNodeIterator = decltype(_nodes)::const_iterator;
+	using NodeIterator = typename std::vector<Node>::iterator;
+	using ConstNodeIterator = typename std::vector<Node>::const_iterator;
 	///@}
 	///@{
 	/**
 	 * \brief Depth-first iterator over all of the Leaf%s contained in the
 	 * Octree.
 	 */
-	using LeafIterator = decltype(_leafs)::iterator;
-	using ConstLeafIterator = decltype(_leafs)::const_iterator;
+	using LeafIterator = typename std::vector<Leaf>::iterator;
+	using ConstLeafIterator = typename std::vector<Leaf>::const_iterator;
 	///@}
 	
 private:
