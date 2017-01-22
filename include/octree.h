@@ -113,7 +113,7 @@ private:
 		Vector<Dim> midpoint = node->_position + childDimensions;
 		auto child = firstChild;
 		for (std::size_t index = 0; index < (1 << Dim); ++index) {
-			child->_depth = _depth + 1;
+			child->_depth = node->_depth + 1;
 			child->_hasParent = true;
 			child->_parentIndex = -((std::ptrdiff_t) index + 1);
 			child->_siblingIndex = index;
@@ -148,7 +148,7 @@ private:
 		// Distribute the leaves of this node to the children.
 		for (std::size_t index = 0; index < node->_leafCount; ++index) {
 			// Figure out which node the leaf belongs to.
-			std::childIndex = 0;
+			std::size_t childIndex = 0;
 			auto leaf = _leafs.begin() + node->_leafIndex + index;
 			Vector<Dim> const& position = leaf->position();
 			for (std::size_t dim = 0; dim < Dim; ++dim) {
