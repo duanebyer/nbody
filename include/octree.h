@@ -39,6 +39,31 @@ namespace nbody {
 template<typename L, typename N, std::size_t Dim>
 class Octree final {
 	
+public:
+	
+	// Type declarations have to be forward declared at the top. The rest of
+	// interface is declared in a second public section below.
+	
+	class Node;
+	class Leaf;
+	
+	///@{
+	/**
+	 * \brief Depth-first iterator over all of the Node%s contained in the
+	 * Octree.
+	 */
+	using NodeIterator = decltype(_nodes)::iterator;
+	using ConstNodeIterator = decltype(_nodes)::const_iterator;
+	///@}
+	///@{
+	/**
+	 * \brief Depth-first iterator over all of the Leaf%s contained in the
+	 * Octree.
+	 */
+	using LeafIterator = decltype(_leafs)::iterator;
+	using ConstLeafIterator = decltype(_leafs)::const_iterator;
+	///@}
+	
 private:
 	
 	// A list storing all of the nodes of the octree.
@@ -277,28 +302,6 @@ private:
 	}
 	
 public:
-	
-	class Node;
-	class Leaf;
-	
-	///@{
-	/**
-	 * \brief Depth-first iterator over all of the Node%s contained in the
-	 * Octree.
-	 */
-	using NodeIterator = decltype(_nodes)::iterator;
-	using ConstNodeIterator = decltype(_nodes)::const_iterator;
-	///@}
-	///@{
-	/**
-	 * \brief Depth-first iterator over all of the Leaf%s contained in the
-	 * Octree.
-	 */
-	using LeafIterator = decltype(_leafs)::iterator;
-	using ConstLeafIterator = decltype(_leafs)::const_iterator;
-	///@}
-	
-	
 	
 	/**
 	 * \brief Constructs a new, empty Octree.
