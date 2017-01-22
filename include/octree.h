@@ -253,8 +253,8 @@ private:
 		auto firstLeaf = inverted ? destLeaf : sourceLeaf;
 		auto lastLeaf = inverted ? sourceLeaf : destLeaf;
 		
-		std::size_t sourceLeafIndex = sourceLeaf - beginLeaf;
-		std::size_t destLeafIndex = destLeaf - beginLeaf;
+		std::size_t sourceLeafIndex = sourceLeaf - _leafs.begin();
+		std::size_t destLeafIndex = destLeaf - _leafs.begin();
 		
 		std::rotate(firstLeaf, sourceLeaf + !inverted, lastLeaf + inverted);
 		
@@ -298,7 +298,7 @@ private:
 			node->_leafIndex -= invertedSign;
 		}
 		
-		return beginLeaf + destLeafIndex;
+		return _leafs.begin() + destLeafIndex;
 	}
 	
 public:
