@@ -45,10 +45,22 @@ class Octree final {
 	
 private:
 	
+	template<bool Const>
+	class LeafRangeBase;
+	
+	template<bool Const, bool Reverse>
+	class LeafIteratorBase;
+	
+	template<IterationOrder Order, bool Const>
+	class NodeRangeBase;
+	
+	template<IterationOrder Order, bool Const, bool Reverse>
+	class NodeIteratorBase;
+	
 	using LeafList = std::vector<Leaf>;
 	using NodeList = std::vector<Node>;
 	
-	struct Leaf {
+	struct Leaf final {
 		
 		L data;
 		Vector<Dim> position;
@@ -60,7 +72,7 @@ private:
 		
 	};
 	
-	struct Node {
+	struct Node final {
 		
 		// The depth of this node within the octree (0 for root, and so on).
 		std::size_t depth;
@@ -135,8 +147,10 @@ private:
 	// Returns whether the node can accomodate a change in the number of leaves
 	// points by 'n' and still hold all of the leaves without needing to
 	// subdivide.
-	template<IterationOrder O>
-	bool canHoldLeafs(ConstNodeIterator<O> node, std::ptrdiff_t n = 0) const;
+	template<IterationOrder Order>
+	bool canHoldLeafs(
+			ConstNodeIterator<Order> node,
+			std::ptrdiff_t n = 0) const;
 	
 	// Divides a node into a set of subnodes and partitions its leaves between
 	// them. This function may reorganize the leaf vector (some leaf iterators
@@ -166,32 +180,38 @@ private:
 	
 public:
 	
-	template<bool Const = false>
-	class LeafRange;
-	using ConstLeafRange = LeafRange<true>;
+	using LeafRange = LeafRangeBase<false>;
+	using ConstLeafRange = LeafRangeBase<true>;
 	
 	///@{
 	/**
 	 * \brief Depth-first iterator over all of the Leaf%s contained in the
 	 * Octree.
 	 */
-	template<bool Const = false>
-	class LeafIterator;
-	using ConstLeafIterator = LeafIterator<true>;
+	using LeafIterator = LeafIterator<false, false>;
+	using ConstLeafIterator = LeafIterator<true, false>;
+	using ReverseLeafIterator = LeafIterator<false, true>;
+	using ConstReverseLeafIterator = LeafIterator<true, true>;
 	///@}
 	
-	template<IterationOrder O, bool Const = false>
-	class NodeRange;
-	using ConstNodeRange = NodeRange<true>;
+	template<IterationOrder Order>
+	using NodeRange = NodeRangeBase<Order, false>;
+	template<IterationOrder Order>
+	using ConstNodeRange = NodeRangeBase<Order, true>;
 	
 	///@{
 	/**
 	 * \brief Depth-first iterator over all of the Node%s contained in the
 	 * Octree.
 	 */
-	template<IterationOrder O, bool Const = false>
-	class NodeIterator;
-	using ConstNodeIterator = NodeIterator<true>;
+	template<IterationOrder Order>
+	using NodeIterator = NodeIteratorBase<Order, false, false>;
+	template<IterationOrder Order>
+	using ConstNodeIterator = NodeIteratorBase<Order, true, false>;
+	template<IterationOrder Order>
+	using ReverseNodeIterator = NodeIteratorBase<Order, false, true>;
+	template<IterationOrder Order>
+	using ConstReverseNodeIterator = NodeIteratorBase<Order, true, true>;
 	///@}
 	
 	/**
@@ -251,14 +271,14 @@ public:
 	 * \return a tuple containing the NodeIterator to the Node that the
 	 * Leaf was added to, and a LeafIterator to the new Leaf
 	 */
-	template<IterationOrder O>
-	std::tuple<NodeIterator<O>, LeafIterator> insert(
-			ConstNodeIterator<O> start,
+	template<IterationOrder Order>
+	std::tuple<NodeIterator<Order>, LeafIterator> insert(
+			ConstNodeIterator<Order> start,
 			Leaf const& data,
 			Vector<Dim> const& position);
 	
-	template<IterationOrder O = IterationOrder::Depth>
-	std::tuple<NodeIterator<O>, LeafIterator> insert(
+	template<IterationOrder Order = IterationOrder::Depth>
+	std::tuple<NodeIterator<Order>, LeafIterator> insert(
 			Leaf const& data,
 			Vector<Dim> const& position);
 	///@}
@@ -279,13 +299,13 @@ public:
 	 * \return a tuple containing the NodeIterator that the Leaf was removed
 	 * from, and the LeafIterator following the removed Leaf
 	 */
-	template<IterationOrder O>
-	std::tuple<NodeIterator<O>, LeafIterator> erase(
-			ConstNodeIterator<O> start,
+	template<IterationOrder Order>
+	std::tuple<NodeIterator<Order>, LeafIterator> erase(
+			ConstNodeIterator<Order> start,
 			LeafIterator leaf);
 	
-	template<IterationOrder O = IterationOrder::Depth>
-	std::tuple<NodeIterator<O>, LeafIterator> erase(
+	template<IterationOrder Order = IterationOrder::Depth>
+	std::tuple<NodeIterator<Order>, LeafIterator> erase(
 			LeafIterator leaf);
 	///@}
 	
@@ -306,9 +326,9 @@ public:
 	 * \return a tuple containing the NodeIterator that the Leaf was removed
 	 * from, the NodeIterator that it was moved to, and the LeafIterator itself
 	 */
-	template<IterationOrder O>
-	std::tuple<NodeIterator<O>, NodeIterator<O>, LeafIterator> move(
-			ConstNodeIterator<O> start,
+	template<IterationOrder Order>
+	std::tuple<NodeIterator<Order>, NodeIterator<Order>, LeafIterator> move(
+			ConstNodeIterator<Order> start,
 			LeafIterator leaf,
 			Vector<Dim> const& position);
 	
@@ -332,22 +352,22 @@ public:
 	 * 
 	 * \return the Node that contains the position
 	 */
-	template<IterationOrder O>
-	NodeIterator<O> find(
-			ConstNodeIterator<O> start,
+	template<IterationOrder Order>
+	NodeIterator<Order> find(
+			ConstNodeIterator<Order> start,
 			Vector<Dim> const& position);
 	
-	template<IterationOrder O = IterationOrder::Depth>
-	NodeIterator<O> find(
+	template<IterationOrder Order = IterationOrder::Depth>
+	NodeIterator<Order> find(
 			Vector<Dim> const& position);
 	
-	template<IterationOrder O>
-	ConstNodeIterator<O> find(
-			ConstNodeIterator<O> start,
+	template<IterationOrder Order>
+	ConstNodeIterator<Order> find(
+			ConstNodeIterator<Order> start,
 			Vector<Dim> const& position) const;
 	
-	template<IterationOrder O = IterationOrder::Depth>
-	ConstNodeIterator<O> find(
+	template<IterationOrder Order = IterationOrder::Depth>
+	ConstNodeIterator<Order> find(
 			Vector<Dim> const& position) const;
 	///@}
 	
@@ -364,33 +384,89 @@ public:
 	 * 
 	 * \return the Node that contains the Leaf
 	 */
-	template<IterationOrder O>
-	NodeIterator<O> find(
-			ConstNodeIterator<O> start,
+	template<IterationOrder Order>
+	NodeIterator<Order> find(
+			ConstNodeIterator<Order> start,
 			ConstLeafIterator leaf);
 	
-	template<IterationOrder O = IterationOrder::Depth>
-	NodeIterator<O> find(
+	template<IterationOrder Order = IterationOrder::Depth>
+	NodeIterator<Order> find(
 			ConstLeafIterator leaf);
 	
-	template<IterationOrder O>
-	ConstNodeIterator<O> find(
-			ConstNodeIterator<O> start,
+	template<IterationOrder Order>
+	ConstNodeIterator<Order> find(
+			ConstNodeIterator<Order> start,
 			ConstLeafIterator leaf) const;
 	
-	template<IterationOrder O = IterationOrder::Depth>
-	ConstNodeIterator<O> find(
+	template<IterationOrder Order = IterationOrder::Depth>
+	ConstNodeIterator<Order> find(
 			ConstLeafIterator leaf) const;
 	///@}
 	
 };
 
-template<typename L, typename N, std::size_t Dim, bool Const>
-class Octree<L, N, Dim>::LeafRange<Const> {
-};
+
 
 template<typename L, typename N, std::size_t Dim, bool Const>
-class Octree<L, N, Dim>::LeafIterator<Const> {
+class Octree<L, N, Dim>::LeafRangeBase<Const> final {
+	
+private:
+	
+	using OctreePointer = std::conditional_t<
+			Const,
+			Octree<L, N, Dim> const*,
+			Octree<L, N, Dim>*>;
+	
+	OctreePointer const _octree;
+	std::size_t _lowerIndex;
+	std::size_t _upperIndex;
+	
+public:
+	
+	using value_type = L;
+	using reference = L&;
+	using const_reference = L const&;
+	using pointer = L*;
+	using pointer = L const*;
+	using iterator = Octree<L, N, Dim>::LeafIterator;
+	using const_iterator = Octree<L, N, Dim>::ConstLeafIterator;
+	using reverse_iterator = Octree<L, N, Dim>::ReverseLeafIterator;
+	using const_reverse_iterator = Octree<L, N, Dim>::ConstReverseLeafIterator;
+	using size_type = std::size_t;
+	using difference_type = std::ptrdiff_t;
+	
+	std::conditional_t<Const, const_iterator, iterator> begin() const;
+	const_iterator cbegin() const;
+	
+	std::conditional_t<Const, const_iterator, iterator> end() const;
+	const_iterator cend() const;
+	
+	std::conditional_t<Const, const_reverse_iterator, reverse_iterator>
+			rbegin() const;
+	const_reverse_iterator crbegin() const;
+	
+	std::conditional_t<Const, const_reverse_iterator, reverse_iterator>
+			rend() const;
+	const_reverse_iterator crend() const;
+	
+	size_type size() const;
+	size_type max_size() const;
+	bool empty() const;
+	
+	std::conditional_t<Const, const_reference, reference> front() const;
+	std::conditional_t<Const, const_reference, reference> back() const;
+	
+	std::conditional_t<Const, const_reference, reference> operator[](
+			size_type n) const;
+	std::conditional_t<Const, const_reference, reference> at(
+			size_type n) const;
+	
+};
+
+
+
+template<typename L, typename N, std::size_t Dim, bool Const, bool Reverse>
+class Octree<L, N, Dim>::LeafIteratorBase<Const, Reverse> final {
 	
 private:
 	
@@ -414,6 +490,7 @@ public:
 			Const,
 			Range::const_pointer,
 			Range::pointer>;
+	using size_type = Range::size_type;
 	using difference_type = Range::difference_type;
 	using iterator_category = std::random_access_iterator_tag;
 	
@@ -423,63 +500,130 @@ public:
 	pointer operator->() const;
 	reference operator[](difference_type n) const;
 	
-	LeafIterator<Const>& operator++();
-	LeafIterator<Const> operator++(int);
+	LeafIteratorBase<Const, Reverse>& operator++();
+	LeafIteratorBase<Const, Reverse> operator++(int);
 	
-	LeafIterator<Const>& operator--();
-	LeafIterator<Const> operator--(int);
+	LeafIteratorBase<Const, Reverse>& operator--();
+	LeafIteratorBase<Const, Reverse> operator--(int);
 	
-	LeafIterator<Const>& operator+=(difference_type n);
-	LeafIterator<Const>& operator-=(difference_type n);
+	LeafIteratorBase<Const, Reverse>& operator+=(difference_type n);
+	LeafIteratorBase<Const, Reverse>& operator-=(difference_type n);
 	
-	friend LeafIterator<Const> operator+(
-			LeafIterator<Const> it,
+	friend LeafIteratorBase<Const, Reverse> operator+(
+			LeafIteratorBase<Const, Reverse> it,
 			difference_type n);
-	friend LeafIterator<Const> operator+(
+	friend LeafIteratorBase<Const, Reverse> operator+(
 			difference_type n,
-			LeafIterator<Const> it);
-	friend LeafIterator<Const> operator-(
-			LeafIterator<Const> it,
+			LeafIteratorBase<Const, Reverse> it);
+	friend LeafIteratorBase<Const, Reverse> operator-(
+			LeafIteratorBase<Const, Reverse> it,
 			difference_type n);
-	friend LeafIterator<Const> operator-(
+	friend LeafIteratorBase<Const, Reverse> operator-(
 			difference_type n,
-			LeafIterator<Const> it);
+			LeafIteratorBase<Const, Reverse> it);
 	
 	friend difference_type operator-(
-			LeafIterator<Const> const& lhs,
-			LeafIterator<Const> const& rhs);
+			LeafIteratorBase<Const, Reverse> const& lhs,
+			LeafIteratorBase<Const, Reverse> const& rhs);
 	
 	friend bool operator==(
-			LeafIterator<Const> const& lhs,
-			LeafIterator<Const> const& rhs);
+			LeafIteratorBase<Const, Reverse> const& lhs,
+			LeafIteratorBase<Const, Reverse> const& rhs);
 	friend bool operator!=(
-			LeafIterator<Const> const& rhs,
-			LeafIterator<Const> const& rhs);
+			LeafIteratorBase<Const, Reverse> const& rhs,
+			LeafIteratorBase<Const, Reverse> const& rhs);
 	friend bool operator<(
-			LeafIterator<Const> const& lhs,
-			LeafIterator<Const> const& rhs);
+			LeafIteratorBase<Const, Reverse> const& lhs,
+			LeafIteratorBase<Const, Reverse> const& rhs);
 	friend bool operator<=(
-			LeafIterator<Const> const& lhs,
-			LeafIterator<Const> const& rhs);
+			LeafIteratorBase<Const, Reverse> const& lhs,
+			LeafIteratorBase<Const, Reverse> const& rhs);
 	friend bool operator>(
-			LeafIterator<Const> const& lhs,
-			LeafIterator<Const> const& rhs);
+			LeafIteratorBase<Const, Reverse> const& lhs,
+			LeafIteratorBase<Const, Reverse> const& rhs);
 	friend bool operator>=(
-			LeafIterator<Const> const& lhs,
-			LeafIterator<Const> const& rhs);
+			LeafIteratorBase<Const, Reverse> const& lhs,
+			LeafIteratorBase<Const, Reverse> const& rhs);
 	
 };
 
-template<typename L, typename N, std::size_t Dim, IterationOrder O, bool Const>
-class Octree<L, N, Dim>::NodeRange<O, Const> {
-};
 
-template<typename L, typename N, std::size_t Dim, IterationOrder O, bool Const>
-class Octree<L, N, Dim>::NodeIterator< {
+
+template<
+		typename L, typename N, std::size_t Dim,
+		IterationOrder Order,
+		bool Const>
+class Octree<L, N, Dim>::NodeRangeBase<Order, Const> {
 	
 private:
 	
-	using Range = Octree<L, N, Dim>::NodeRange<O, Const>;
+	using OctreePointer = std::conditional_t<
+			Const,
+			Octree<L, N, Dim> const*,
+			Octree<L, N, Dim>*>;
+	
+	OctreePointer const _octree;
+	std::size_t _lowerIndex;
+	std::size_t _upperIndex;
+	
+public:
+	
+	using value_type = N;
+	using reference = N&;
+	using const_reference = N const&;
+	using pointer = N*;
+	using pointer = N const*;
+	using iterator =
+			Octree<L, N, Dim>::NodeIterator<Order>;
+	using const_iterator =
+			Octree<L, N, Dim>::ConstNodeIterator<Order>;
+	using reverse_iterator =
+			Octree<L, N, Dim>::ReverseNodeIterator<Order>;
+	using const_reverse_iterator =
+			Octree<L, N, Dim>::ConstReverseNodeIterator<Order>;
+	using size_type = std::size_t;
+	using difference_type = std::ptrdiff_t;
+	
+	std::conditional_t<Const, const_iterator, iterator> begin() const;
+	const_iterator cbegin() const;
+	
+	std::conditional_t<Const, const_iterator, iterator> end() const;
+	const_iterator cend() const;
+	
+	std::conditional_t<Const, const_reverse_iterator, reverse_iterator>
+			rbegin() const;
+	const_reverse_iterator crbegin() const;
+	
+	std::conditional_t<Const, const_reverse_iterator, reverse_iterator>
+			rend() const;
+	const_reverse_iterator crend() const;
+	
+	size_type size() const;
+	size_type max_size() const;
+	bool empty() const;
+	
+	std::conditional_t<Const, const_reference, reference> front() const;
+	std::conditional_t<Const, const_reference, reference> back() const;
+	
+	std::conditional_t<Const, const_reference, reference> operator[](
+			size_type n) const;
+	std::conditional_t<Const, const_reference, reference> at(
+			size_type n) const;
+	
+};
+
+
+
+template<
+		typename L, typename N, std::size_t Dim,
+		IterationOrder Order,
+		bool Const,
+		bool Reverse>
+class Octree<L, N, Dim>::NodeIteratorBase<Order, Const, Reverse> {
+	
+private:
+	
+	using Range = Octree<L, N, Dim>::NodeRange<Order, Const>;
 	using OctreePointer = std::conditional_t<
 			Const,
 			Octree<L, N, Dim> const*,
@@ -499,57 +643,70 @@ public:
 			Const,
 			Range::const_pointer,
 			Range::pointer>;
+	using size_type = Range::size_type;
 	using difference_type = Range::difference_type;
 	using iterator_category = std::random_access_iterator_tag;
+	
+	Vector<Dim> const& position() const;
+	Vector<Dim> const& dimensions() const;
+	
+	bool hasParent() const;
+	NodeIteratorBase<Order, Const, Reverse> parent() const;
+	
+	bool hasChildren() const;
+	NodeIteratorBase<Order, Const, Reverse> child(size_type childIndex) const;
+	NodeRangeBase<Order, Const, Reverse> children() const;
+	
+	LeafRangeBase<Const, Reverse> leaves() const;
 	
 	reference operator*() const;
 	pointer operator->() const;
 	reference operator[](difference_type n) const;
 	
-	NodeIterator<O, Const>& operator++();
-	NodeIterator<O, Const> operator++(int);
+	NodeIteratorBase<Order, Const, Reverse>& operator++();
+	NodeIteratorBase<Order, Const, Reverse> operator++(int);
 	
-	NodeIterator<O, Const>& operator--();
-	NodeIterator<O, Const> operator--(int);
+	NodeIteratorBase<Order, Const, Reverse>& operator--();
+	NodeIteratorBase<Order, Const, Reverse> operator--(int);
 	
-	NodeIterator<O, Const>& operator+=(difference_type n);
-	NodeIterator<O, Const>& operator-=(difference_type n);
+	NodeIteratorBase<Order, Const, Reverse>& operator+=(difference_type n);
+	NodeIteratorBase<Order, Const, Reverse>& operator-=(difference_type n);
 	
-	friend NodeIterator<O, Const> operator+(
-			NodeIterator<O, Const> it,
+	friend NodeIteratorBase<Order, Const, Reverse> operator+(
+			NodeIteratorBase<Order, Const, Reverse> it,
 			difference_type n);
-	friend NodeIterator<O, Const> operator+(
+	friend NodeIteratorBase<Order, Const, Reverse> operator+(
 			difference_type n,
-			NodeIterator<O, Const> it);
-	friend NodeIterator<O, Const> operator-(
-			NodeIterator<O, Const> it,
+			NodeIteratorBase<Order, Const, Reverse> it);
+	friend NodeIteratorBase<Order, Const, Reverse> operator-(
+			NodeIteratorBase<Order, Const, Reverse> it,
 			difference_type n);
-	friend NodeIterator<O, Const> operator-(
+	friend NodeIteratorBase<Order, Const, Reverse> operator-(
 			difference_type n,
-			NodeIterator<O, Const> it);
+			NodeIteratorBase<Order, Const, Reverse> it);
 	
 	friend difference_type operator-(
-			NodeIterator<O, Const> const& lhs,
-			NodeIterator<O, Const> const& rhs);
+			NodeIteratorBase<Order, Const, Reverse> const& lhs,
+			NodeIteratorBase<Order, Const, Reverse> const& rhs);
 	
 	friend bool operator==(
-			NodeIterator<O, Const> const& lhs,
-			NodeIterator<O, Const> const& rhs);
+			NodeIteratorBase<Order, Const, Reverse> const& lhs,
+			NodeIteratorBase<Order, Const, Reverse> const& rhs);
 	friend bool operator!=(
-			NodeIterator<O, Const> const& lhs,
-			NodeIterator<O, Const> const& rhs);
+			NodeIteratorBase<Order, Const, Reverse> const& lhs,
+			NodeIteratorBase<Order, Const, Reverse> const& rhs);
 	friend bool operator<(
-			NodeIterator<O, Const> const& lhs,
-			NodeIterator<O, Const> const& rhs);
+			NodeIteratorBase<Order, Const, Reverse> const& lhs,
+			NodeIteratorBase<Order, Const, Reverse> const& rhs);
 	friend bool operator<=(
-			NodeIterator<O, Const> const& lhs,
-			NodeIterator<O, Const> const& rhs);
+			NodeIteratorBase<Order, Const, Reverse> const& lhs,
+			NodeIteratorBase<Order, Const, Reverse> const& rhs);
 	friend bool operator>(
-			NodeIterator<O, Const> const& lhs,
-			NodeIterator<O, Const> const& rhs);
+			NodeIteratorBase<Order, Const, Reverse> const& lhs,
+			NodeIteratorBase<Order, Const, Reverse> const& rhs);
 	friend bool operator>=(
-			NodeIterator<O, Const> const& lhs,
-			NodeIterator<O, Const> const& rhs);
+			NodeIteratorBase<Order, Const, Reverse> const& lhs,
+			NodeIteratorBase<Order, Const, Reverse> const& rhs);
 	
 };
 
