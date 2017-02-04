@@ -147,36 +147,54 @@ private:
 	// Returns whether the node can accomodate a change in the number of leaves
 	// points by 'n' and still hold all of the leaves without needing to
 	// subdivide.
-	template<IterationOrder Order>
+	template<IterationOrder Order, bool Const, bool Reverse>
 	bool canHoldLeafs(
-			ConstNodeIterator<Order> node,
+			NodeIteratorBase<Order, Const, Reverse> node,
 			std::ptrdiff_t n = 0) const;
 	
 	// Divides a node into a set of subnodes and partitions its leaves between
 	// them. This function may reorganize the leaf vector (some leaf iterators
 	// may become invalid).
-	NodeList::iterator createChildren(NodeList::const_iterator node);
+	template<IterationOrder Order, bool Const, bool Reverse>
+	NodeIteratorBase<Order, false, Reverse> createChildren(
+			NodeIteratorBase<Order, Const, Reverse> node);
 	
 	// Destroys all descendants of a node and takes their leaves into the node.
 	// This function will not reorganize the leaf vector (all leaf iterators
 	// will remain valid).
-	NodeList::iterator destroyChildren(NodeList::const_iterator node);
+	template<IterationOrder Order, bool Const, bool Reverse>
+	NodeIteratorBase<Order, false, Reverse> destroyChildren(
+			NodeIteratorBase<Order, Const, Reverse> node);
 	
 	// Adds a leaf to a specific node.
-	LeafList::iterator insertAt(
-			NodeList::const_iterator node,
+	template<
+			IterationOrder NOrder,
+			bool NConst, bool NReverse,
+			bool LReverse = false>
+	LeafIteratorBase<false, LReverse> insertAt(
+			NodeIteratorBase<Order, Const, Reverse> node,
 			Leaf const& leaf);
 	
 	// Removes a leaf from a node.
-	LeafList::iterator eraseAt(
-			NodeList::const_iterator node,
-			LeafList::const_iterator leaf);
+	template<
+			IterationOrder NOrder,
+			bool NConst, bool NReverse,
+			bool LConst, bool LReverse>
+	LeafIteratorBase<false, LReverse> eraseAt(
+			NodeIteratorBase<NOrder, NConst, NReverse> node,
+			LeafIteratorBase<LConst, LReverse> leaf);
 	
 	// Moves a leaf from this node to another one.
-	LeafList::iterator moveAt(
-			NodeList::const_iterator sourceNode,
-			NodeList::const_iterator destNode,
-			LeafList::const_iterator sourceLeaf);
+	template<
+			IterationOrder N1Order,
+			bool N1Const, bool N1Reverse,
+			IterationOrder N2Order,
+			bool N2Const, bool N2Reverse,
+			bool LConst, bool LReverse>
+	LeafIteratorBase<false, LReverse> moveAt(
+			NodeIteratorBase<N1Order, N1Const, N1Reverse> sourceNode,
+			NodeIteratorBase<N2Order, N2Const, N2Reverse> destNode,
+			LeafIteratorBase<LConst, LReverse> sourceLeaf);
 	
 public:
 	
@@ -233,6 +251,17 @@ public:
 			std::size_t maxDepth = sizeof(Scalar) * CHAR_BIT,
 			bool adjust = true);
 	
+	LeafRange leafs();
+	ConstLeafRange leafs() const;
+	ConstLeafRange cleafs() const;
+	
+	template<IterationOrder Order = IterationOrder::Depth>
+	NodeRange<Order> nodes();
+	template<IterationOrder Order = IterationOrder::Depth>
+	ConstNodeRange<Order> nodes() const;
+	template<IterationOrder Order = IterationOrder::Depth>
+	ConstNodeRange<Order> cnodes() const;
+	
 	///@{
 	/**
 	 * \brief Creates and destroys Node%s so that the Octree has the minimum
@@ -248,7 +277,8 @@ public:
 	 * 
 	 * \return whether any changes were actually made
 	 */
-	bool adjust(ConstNodeIterator node);
+	template<IterationOrder Order>
+	bool adjust(ConstNodeIterator<Order> node);
 	bool adjust();
 	///@}
 	
@@ -274,12 +304,12 @@ public:
 	template<IterationOrder Order>
 	std::tuple<NodeIterator<Order>, LeafIterator> insert(
 			ConstNodeIterator<Order> start,
-			Leaf const& data,
+			L const& data,
 			Vector<Dim> const& position);
 	
 	template<IterationOrder Order = IterationOrder::Depth>
 	std::tuple<NodeIterator<Order>, LeafIterator> insert(
-			Leaf const& data,
+			L const& data,
 			Vector<Dim> const& position);
 	///@}
 	
@@ -435,6 +465,8 @@ public:
 	using size_type = std::size_t;
 	using difference_type = std::ptrdiff_t;
 	
+	operator LeafRangeBase<true>() const;
+	
 	std::conditional_t<Const, const_iterator, iterator> begin() const;
 	const_iterator cbegin() const;
 	
@@ -471,6 +503,11 @@ class Octree<L, N, Dim>::LeafIteratorBase<Const, Reverse> final {
 private:
 	
 	using Range = Octree<L, N, Dim>::LeafRange<Const>;
+	using List = Octree<L, N, Dim>::LeafList;
+	using ListIterator = std::conditional_t<
+			Const,
+			List::const_iterator,
+			List::iterator>;
 	using OctreePointer = std::conditional_t<
 			Const,
 			Octree<L, N, Dim> const*,
@@ -478,6 +515,10 @@ private:
 	
 	OctreePointer const _octree;
 	Range::size_type _index;
+	
+	explicit LeafIteratorBase(ListIterator it);
+	
+	ListIterator listIt() const;
 	
 public:
 	
@@ -493,6 +534,8 @@ public:
 	using size_type = Range::size_type;
 	using difference_type = Range::difference_type;
 	using iterator_category = std::random_access_iterator_tag;
+	
+	operator LeafIteratorBase<true, Reverse>() const;
 	
 	Vector<Dim> const& position() const;
 	
@@ -584,6 +627,8 @@ public:
 	using size_type = std::size_t;
 	using difference_type = std::ptrdiff_t;
 	
+	operator NodeRangeBase<Order, true>() const;
+	
 	std::conditional_t<Const, const_iterator, iterator> begin() const;
 	const_iterator cbegin() const;
 	
@@ -624,6 +669,11 @@ class Octree<L, N, Dim>::NodeIteratorBase<Order, Const, Reverse> {
 private:
 	
 	using Range = Octree<L, N, Dim>::NodeRange<Order, Const>;
+	using List = Octree<L, N, Dim>::NodeList;
+	using ListIterator = std::conditional_t<
+			Const,
+			List::const_iterator,
+			List::iterator>;
 	using OctreePointer = std::conditional_t<
 			Const,
 			Octree<L, N, Dim> const*,
@@ -631,6 +681,10 @@ private:
 	
 	OctreePointer const _octree;
 	Range::size_type _index;
+	
+	explicit NodeIteratorBase(ListIterator it);
+	
+	ListIterator listIt() const;
 	
 public:
 	
@@ -647,17 +701,22 @@ public:
 	using difference_type = Range::difference_type;
 	using iterator_category = std::random_access_iterator_tag;
 	
+	operator NodeIteratorBase<Order, true, Reverse>() const;
+	
 	Vector<Dim> const& position() const;
 	Vector<Dim> const& dimensions() const;
+	bool contains(Vector<Dim> const& point) const;
 	
 	bool hasParent() const;
 	NodeIteratorBase<Order, Const, Reverse> parent() const;
 	
 	bool hasChildren() const;
-	NodeIteratorBase<Order, Const, Reverse> child(size_type childIndex) const;
-	NodeRangeBase<Order, Const, Reverse> children() const;
+	NodeIteratorBase<Order, Const, Reverse> child(
+		std::size_type childIndex) const;
+	NodeRangeBase<Order, Const> children() const;
 	
-	LeafRangeBase<Const, Reverse> leaves() const;
+	NodeRangeBase<Order, Const> nodes() const;
+	LeafRangeBase<Const> leafs() const;
 	
 	reference operator*() const;
 	pointer operator->() const;
