@@ -32,28 +32,12 @@ Octree<L, N, Dim>::Octree(
 	leafs.insert(leafs.begin(), root);
 }
 
-template<
-		typename L, typename N, std::size_t Dim,
-		IterationOrder Order, bool Const, bool Reverse>
-bool Octree<L, N, Dim>::canHoldLeafs(
-		Octree<L, N, Dim>::NodeIteratorBase<Order, Const, Reverse> nodeIt,
-		std::ptrdiff_t n) const {
-	// If the depth of the node is larger than the max, then it has infinite
-	// capacity.
+template<typename L, typename N, typename Dim>
+template<IterationOrder Order>
+Octree<L, N, Dim>::NodeIterator<Order> Octree<L, N, Dim>::createChildren(
+		ConstNodeIterator<Order> nodeIt) {
 	auto node = nodeIt.listIt();
-	return
-		node->dataCount + n < _nodeCapacity ||
-		node->depth >= _maxDepth;
-}
-
-template<
-		typename L, typename N, typename Dim,
-		IterationOrder Order, bool Const, bool Reverse>
-Octree<L, N, Dim>::NodeIteratorBase<Order, false, Reverse>
-Octree<L, N, Dim>::createChildren(
-		Octree<L, N, Dim>NodeIteratorBase<Order, Const, Reverse> nodeIt) {
-	auto node = nodeIt.listIt();
-	// Create the 2^Dim child nodes inside the parent octree.
+	// Create the 2^Dim child nodes inside the list of nodes.
 	auto firstChild = _nodes.insert(node, 1 << Dim, Node());
 	
 	// Update the node iterator as it has been invalidated.
@@ -113,12 +97,10 @@ Octree<L, N, Dim>::createChildren(
 	return NodeIteratorBase<Order, Const, Reverse>(node);
 }
 
-template<
-		typename L, typename N, std::size_t Dim,
-		IterationOrder Order, bool Const, bool Reverse>
-Octree<L, N, Dim>::NodeIteratorBase<Order, Const, Reverse>
-Octree<L, N, Dim>::destroyChildren(
-		Octree<L, N, Dim>::NodeIteratorBase<Order, Const, Reverse> nodeIt) {
+template<typename L, typename N, std::size_t Dim>
+template<IterationOrder Order>
+Octree<L, N, Dim>::NodeIterator<Order> Octree<L, N, Dim>::destroyChildren(
+		ConstNodeIterator<Order> nodeIt) {
 	auto node = nodeIt.listIt();
 	// Determine how many children, grandchildren, great-grandchildren, ...
 	// of this node.
@@ -144,13 +126,10 @@ Octree<L, N, Dim>::destroyChildren(
 	return NodeIteratorBase<Order, Const, Reverse>(node);
 }
 
-template<
-		typename L, typename N, std::size_t Dim,
-		IterationOrder NOrder, bool NConst, bool NReverse,
-		bool LReverse>
-Octree<L, N, Dim>::LeafIteratorBase<false, LReverse>
-Octree<L, N, Dim>::insertAt(
-		Octree<L, N, Dim>::NodeIteratorBase<NOrder, NConst, NReverse> nodeIt,
+template<typename L, typename N, std::size_t Dim>
+template<IterationOrder Order>
+Octree<L, N, Dim>::LeafIterator Octree<L, N, Dim>::insertAt(
+		ConstNodeIterator<Order> nodeIt,
 		Leaf const& leaf) {
 	auto node = nodeIt.listIt();
 	// Add the leaf to the master list of leaves in the octree and update
@@ -175,14 +154,11 @@ Octree<L, N, Dim>::insertAt(
 	return LeafIteratorBase<false, LReverse>(newLeaf);
 }
 
-template<
-		typename L, typename N, std::size_t Dim,
-		IterationOrder NOrder, bool NConst, bool NReverse,
-		bool LConst, bool LReverse>
-Octree<L, N, Dim>::LeafIteratorBase<false, LReverse>
-Octree<L, N, Dim>::eraseAt(
-		Octree<L, N, Dim>::NodeIteratorBase<NOrder, NConst, NReverse> nodeIt,
-		Octree<L, N, Dim>::LeafIteratorBase<LConst, LReverse> leafIt) {
+template<typename L, typename N, std::size_t Dim>
+template<IterationOrder Order>
+Octree<L, N, Dim>::LeafIterator Octree<L, N, Dim>::eraseAt(
+		ConstNodeIterator<Order> nodeIt,
+		ConstLeafIterator<Order> leafIt) {
 	auto node = nodeIt.listIt();
 	auto leaf = leafIt.listIt();
 	// Remove the leaf from the master octree leaf vector.
@@ -206,18 +182,12 @@ Octree<L, N, Dim>::eraseAt(
 	return LeafIteratorBase<false, LReverse>(next);
 }
 
-template<
-		typename L, typename N, std::size_t Dim,
-		IterationOrder N1Order, bool N1Const, bool N1Reverse,
-		IterationOrder N2Order, bool N2Const, bool N2Reverse,
-		bool LConst, bool LReverse>
-Octree<L, N, Dim>::LeafIterator<false, LReverse> Octree<L, N, Dim>::moveAt(
-		Octree<L, N, Dim>::NodeIteratorBase<N1Order, N1Const, N1Reverse>
-		sourceNodeIt,
-		Octree<L, N, Dim>::NodeIteratorBase<N2Order, N2Const, N2Reverse>
-		destNodeIt,
-		Octree<L, N, Dim>::LeafIteratorBase<LConst, LReverse>
-		sourceLeafIt) {
+template<typename L, typename N, std::size_t Dim>
+template<IterationOrder Order>
+Octree<L, N, Dim>::LeafIterator Octree<L, N, Dim>::moveAt(
+		ConstNodeIterator<Order> sourceNodeIt,
+		ConstNodeIterator<Order> destNodeIt,
+		ConstLeafIterator sourceLeafIt) {
 	auto sourceNode = sourceNodeIt.listIt();
 	auto destNode = destNodeIt.listIt();
 	auto sourceLeaf = sourceLeafIt.listIt();
@@ -276,9 +246,10 @@ Octree<L, N, Dim>::LeafIterator<false, LReverse> Octree<L, N, Dim>::moveAt(
 	return LeafIteratorBase<LConst, LReverse>(_leafs.begin() + destLeafIndex);
 }
 
-template<typename L, typename N, std::size_t Dim, IterationOrder Order>
+template<typename L, typename N, std::size_t Dim>
+template<IterationOrder Order>
 bool Octree<L, N, Dim>::adjust(
-		Octree<L, N, Dim>::ConstNodeIterator<Order> node) {
+		ConstNodeIterator<Order> node) {
 	bool result = false;
 	// If the node doesn't have children but should, then make them.
 	if (!node->hasChildren && !canHoldLeafs(node, 0)) {
@@ -307,12 +278,13 @@ bool Octree<L, N, Dim>::adjust() {
 	return adjust(root());
 }
 
-template<typename L, typename N, std::size_t Dim, IterationOrder Order>
+template<typename L, typename N, std::size_t Dim>
+template<IterationOrder Order>
 std::tuple<
 		Octree<L, N, Dim>::NodeIterator<Order>,
 		Octree<L, N, Dim>::LeafIterator>
 Octree<L, N, Dim>::insert(
-		Octree<L, N, Dim>::ConstNodeIterator<Order> start,
+		ConstNodeIterator<Order> start,
 		L const& data,
 		Vector<Dim> const& position) {
 	// Find the node with the correct position, and insert the leaf into
@@ -331,7 +303,8 @@ Octree<L, N, Dim>::insert(
 	return std::make_tuple(node, insertAt(node, leaf));
 }
 
-template<typename L, typename N, std::size_t Dim, IterationOrder Order>
+template<typename L, typename N, std::size_t Dim>
+template<IterationOrder Order>
 std::tuple<
 		Octree<L, N, Dim>::NodeIterator<Order>,
 		Octree<L, N, Dim>::LeafIterator>
@@ -341,13 +314,14 @@ Octree<L, N, Dim>::insert(
 	return insert(root(), data, position);
 }
 
-template<typename L, typename N, std::size_t Dim, IterationOrder Order>
+template<typename L, typename N, std::size_t Dim>
+template<IterationOrder Order>
 std::tuple<
 		Octree<L, N, Dim>::NodeIterator<Order>,
 		Octree<L, N, Dim>::LeafIterator>
 Octree<L, N, Dim>::erase(
-		Octree<L, N, Dim>::ConstNodeIterator<Order> start,
-		Octree<L, N, Dim>::LeafIterator leaf) {
+		ConstNodeIterator<Order> start,
+		LeafIterator leaf) {
 	// Find the node that contains this leaf, and then erase the leaf from
 	// that node.
 	auto node = find(start, leaf);
@@ -365,23 +339,25 @@ Octree<L, N, Dim>::erase(
 	return std::make_tuple(node, eraseAt(node, leaf));
 }
 
-template<typename L, typename N, std::size_t Dim, IterationOrder Order>
+template<typename L, typename N, std::size_t Dim>
+template<IterationOrder Order>
 std::tuple<
 		Octree<L, N, Dim>::NodeIterator<Order>,
 		Octree<L, N, Dim>::LeafIterator>
 Octree<L, N, Dim>::erase(
-		Octree<L, N, Dim>::LeafIterator leaf) {
+		LeafIterator leaf) {
 	return erase(root(), leaf);
 }
 
-template<typename L, typename N, std::size_t Dim, IterationOrder Order>
+template<typename L, typename N, std::size_t Dim>
+template<IterationOrder Order>
 std::tuple<
 		Octree<L, N, Dim>::NodeIterator<Order>,
 		Octree<L, N, Dim>::NodeIterator<Order>,
 		Octree<L, N, Dim>::LeafIterator>
 Octree<L, N, Dim>::move(
-		Octree<L, N, Dim>::ConstNodeIterator<Order> start,
-		Octree<L, N, Dim>::LeafIterator leaf,
+		ConstNodeIterator<Order> start,
+		LeafIterator leaf,
 		Vector<Dim> const& position) {
 	// Find the source node that contains the leaf, and the target node with
 	// the correct position.
@@ -416,17 +392,19 @@ Octree<L, N, Dim>::move(
 	return std::make_tuple(source, dest, moveAt(source, dest, leaf));
 }
 
-template<typename L, typename N, std::size_t Dim, IterationOrder Order>
+template<typename L, typename N, std::size_t Dim>
+template<IterationOrder Order>
 std::tuple<
 		Octree<L, N, Dim>::NodeIterator<Order>,
 		Octree<L, N, Dim>::NodeIterator<Order>,
 		Octree<L, N, Dim>::LeafIterator>
 Octree<L, N, Dim>::move(
-		Octree<L, N, Dim>::LeafIterator leaf,
+		LeafIterator leaf,
 		Vector<Dim> const& position) {
 	return move(root(), leaf, position);
 }
 
+/*
 template<typename L, typename N, std::size_t Dim>
 bool contains(ConstNodeIterator node, Vector<Dim> const& point) {
 	Vector<Dim> lower = node->position;
@@ -440,118 +418,86 @@ bool contains(ConstNodeIterator node, Vector<Dim> const& point) {
 	}
 	return true;
 }
+*/
 
-template<typename L, typename N, std::size_t Dim, IterationOrder Order>
+template<typename L, typename N, std::size_t Dim>
+template<IterationOrder Order>
 Octree<L, N, Dim>::NodeIterator<Order> Octree<L, N, Dim>::find(
-		Octree<L, N, Dim>::ConstNodeIterator<Order> startIt,
+		ConstNodeIterator<Order> start,
 		Vector<Dim> const& position) {
-	auto start = startIt.listIt();
-	
 	bool contains = start.contains(position);
-	auto node = start;
 	// If this node is childless and contains the point, then just return it.
-	if (contains && !node->hasChildren) {
-		return NodeIterator<Order>(node);
+	if (contains && !start.hasChildren()) {
+		return start;
 	}
 	// If it is childless but contains the point, then recursively call this
 	// method on the child that also conains the point.
-	else if (contains && node->hasChildren) {
-		auto child = node + 1;
-		Vector<Dim> midpoint = node->position + node->dimensions / 2;
-		for (std::size_t dim = 0; dim < Dim; ++dim) {
-			if (position[dim] >= midpoint[dim]) {
-				child += (1 << dim);
-			}
-		}
-		return find(ConstNodeIterator<Order>(child), position);
+	else if (contains && start.hasChildren()) {
+		return find(start.child(position), position);
 	}
 	// If it does not contain the point, then recursively call this method on
 	// the parent of this node.
-	else if (node->hasParent) {
-		auto parent = node + node->parentIndex;
-		return find(ConstNodeIterator<Order>(parent), position);
+	else if (start.hasParent()) {
+		return find(start.parent(), position);
 	}
 	return nodes().end();
 }
 
-template<typename L, typename N, std::size_t Dim, IterationOrder Order>
+template<typename L, typename N, std::size_t Dim>
+template<IterationOrder Order>
 Octree<L, N, Dim>::NodeIterator<Order> Octree<L, N, Dim>::find(
-		Vector<Dim> const& position) {
-	return find(nodes().begin(), position);
-}
-
-template<typename L, typename N, std::size_t Dim, IterationOrder Order>
-Octree<L, N, Dim>::ConstNodeIterator<Order> Octree<L, N, Dim>::find(
-		Octree<L, N, Dim>::ConstNodeIterator<Order> start,
-		Vector<Dim> const& position) const {
-	return const_cast<Octree<L, N, Dim>*>(this)->find(
-		start, position);
-}
-
-template<typename L, typename N, std::size_t Dim, IterationOrder Order>
-Octree<L, N, Dim>::ConstNodeIterator<Order> Octree<L, N, Dim>::find(
-		Vector<Dim> const& position) const {
-	return find(nodes().begin(), position);
-}
-
-template<typename L, typename N, std::size_t Dim, IterationOrder Order>
-Octree<L, N, Dim>::NodeIterator<Order> Octree<L, N, Dim>::find(
-		Octree<L, N, Dim>::ConstNodeIterator<Order> startIt,
-		Octree<L, N, Dim>::ConstLeafIterator leafIt) {
-	auto start = startIt.listIt();
-	auto leaf = leafIt.listIt();
-	
-	auto node = start;
-	
-	std::size_t leafIndex = leaf - _leafs.begin();
-	std::size_t lower = node->leafIndex;
-	std::size_t upper = lower + node->leafCount;
-	
-	bool contains = leafIndex >= lower && leafIndex < upper;
-	
+		ConstNodeIterator<Order> start,
+		ConstLeafIterator leaf) {
+	bool contains = start.contains(leaf);
 	// If this node is childless and contains the leaf, then return itself.
-	if (contains && !node->hasChildren) {
-		return NodeIterator<Order>(node);
+	if (contains && !start.hasChildren()) {
+		return start;
 	}
 	// If it has children and contains the leaf, then recursively call this
 	// method on the child that contains the leaf.
 	else if (contains && node->hasChildren) {
-		for (std::size_t index = 0; index < (1 << Dim); ++index) {
-			auto child = node + node->childIndices[index];
-			std::size_t lower = child->leafIndex;
-			std::size_t upper = lower + child->leafCount;
-			if (leafIndex >= lower && leafIndex < upper) {
-				return find(NodeIterator<Order>(child), leafIt);
-			}
-		}
+		return find(start.child(leaf), leaf);
 	}
 	// If it doesn't contain the leaf, the recursively call this method on the
 	// parent of this node.
 	else if (node->hasParent) {
-		auto parent = node + node->parentIndex;
-		return find(NodeIterator<Order>(parent), leafIt);
+		return find(start.parent(), leaf);
 	}
 	return nodes().end();
 }
 
-template<typename L, typename N, std::size_t Dim, IterationOrder Order>
-Octree<L, N, Dim>::NodeIterator<Order> Octree<L, N, Dim>::find(
-		Octree<L, N, Dim>::ConstLeafIterator leaf) {
-	return find(nodes().begin(), leaf);
+// *--------------------------*
+// | NodeIteratorBase methods |
+// *--------------------------*
+
+template<typename L, typename N, std::size_t Dim>
+template<IterationOrder Order, bool Const, bool Reverse>
+Octree<L, N, Dim>::NodeRangeBase<Order, Const>
+Octree<L, N, Dim>::NodeIteratorBase<Order, Const, Reverse> children() const {
+	return NodeRangeBase<Order, Const>(
+		_octree,
+		_index + listRef().childIndices[0],
+		_index + listRef().childIndices[1 << Dim]);
 }
 
-template<typename L, typename N, std::size_t Dim, IterationOrder Order>
-Octree<L, N, Dim>::ConstNodeIterator<Order> Octree<L, N, Dim>::find(
-		Octree<L, N, Dim>::ConstNodeIterator<Order> start,
-		Octree<L, N, Dim>::ConstLeafIterator leaf) const {
-	return const_cast<Octree<L, N, Dim>*>(this)->find(
-		start, leaf);
+template<typename L, typename N, std::size_t Dim>
+template<IterationOrder Order, bool Const, bool Reverse>
+Octree<L, N, Dim>::NodeRangeBase<Order, Const>
+Octree<L, N, Dim>::NodeIteratorBase<Order, Const, Reverse> nodes() const {
+	return NodeRangeBase<Order, Const>(
+		_octree,
+		_index,
+		_index + listRef().childIndices[1 << Dim]);
 }
 
-template<typename L, typename N, std::size_t Dim, IterationOrder Order>
-Octree<L, N, Dim>::ConstNodeIterator<Order> Octree<L, N, Dim>::find(
-		Octree<L, N, Dim>::ConstLeafIterator leaf) const {
-	return find(nodes().begin(), leaf);
+template<typename L, typename N, std::size_t Dim>
+template<IterationOrder Order, bool Const, bool Reverse>
+Octree<L, N, Dim>::LeafRangeBase<Const>
+Octree<L, N, Dim>::NodeIteratorBase<Order, Const, Reverse> leafs() const {
+	return LeafRangeBase<Const>(
+		_octree,
+		listRef().leafIndex,
+		listRef().leafIndex + listRef().leafCount);
 }
 
 #endif
