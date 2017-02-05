@@ -258,7 +258,9 @@ public:
 	 */
 	template<IterationOrder Order>
 	bool adjust(ConstNodeIterator<Order> node);
-	bool adjust();
+	bool adjust() {
+		return adjust(nodes().begin());
+	}
 	///@}
 	
 	///@{
@@ -437,14 +439,8 @@ private:
 	
 	using Range = Octree<L, N, Dim>::LeafRange<Const>;
 	using List = Octree<L, N, Dim>::LeafList;
-	using ListIterator = std::conditional_t<
-			Const,
-			List::const_iterator,
-			List::iterator>;
-	using ListReference = std::conditional_t<
-			Const,
-			List::const_reference, // Should be Leaf const&
-			List::reference>;      // Should be Leaf&
+	using ListIterator = List::iterator;
+	using ListReference = List::reference;
 	using OctreePointer = std::conditional_t<
 			Const,
 			Octree<L, N, Dim> const*,
@@ -729,14 +725,8 @@ private:
 	
 	using Range = Octree<L, N, Dim>::NodeRange<Order, Const>;
 	using List = Octree<L, N, Dim>::NodeList;
-	using ListIterator = std::conditional_t<
-			Const,
-			List::const_iterator,
-			List::iterator>;
-	using ListReference = std::conditional_t<
-			Const,
-			List::const_reference, // Should be Node const&
-			List::reference>;      // Should be Node&
+	using ListIterator = List::iterator;
+	using ListReference = List::reference;
 	using OctreePointer = std::conditional_t<
 			Const,
 			Octree<L, N, Dim> const*,
