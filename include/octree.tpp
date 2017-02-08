@@ -274,13 +274,13 @@ std::tuple<
 		Octree<L, N, Dim>::NodeIterator,
 		Octree<L, N, Dim>::LeafIterator>
 Octree<L, N, Dim>::insert(
-		ConstNodeIterator start,
+		ConstNodeIterator hint,
 		L const& data,
 		Vector<Dim> const& position) {
 	// Find the node with the correct position, and insert the leaf into
 	// that node.
 	Leaf leaf(data, position);
-	auto node = find(start, leaf.position());
+	auto node = find(hint, leaf.position());
 	if (node == nodes().end()) {
 		return leafs().end();
 	}
@@ -308,11 +308,11 @@ std::tuple<
 		Octree<L, N, Dim>::NodeIterator,
 		Octree<L, N, Dim>::LeafIterator>
 Octree<L, N, Dim>::erase(
-		ConstNodeIterator start,
+		ConstNodeIterator hint,
 		LeafIterator leaf) {
 	// Find the node that contains this leaf, and then erase the leaf from
 	// that node.
-	auto node = find(start, leaf);
+	auto node = find(hint, leaf);
 	if (node == _nodes.end()) {
 		return _leafs.end();
 	}
@@ -342,13 +342,13 @@ std::tuple<
 		Octree<L, N, Dim>::NodeIterator,
 		Octree<L, N, Dim>::LeafIterator>
 Octree<L, N, Dim>::move(
-		ConstNodeIterator start,
+		ConstNodeIterator hint,
 		LeafIterator leaf,
 		Vector<Dim> const& position) {
 	// Find the source node that contains the leaf, and the target node with
 	// the correct position.
-	auto source = find(start, leaf);
-	auto dest = find(start, position);
+	auto source = find(hint, leaf);
+	auto dest = find(hint, position);
 	if (source == _nodes.end() || dest == _nodes.end()) {
 		return _leafs.end();
 	}
@@ -407,44 +407,44 @@ bool contains(ConstNodeIterator node, Vector<Dim> const& point) {
 
 template<typename L, typename N, std::size_t Dim>
 Octree<L, N, Dim>::NodeIterator Octree<L, N, Dim>::find(
-		ConstNodeIterator start,
+		ConstNodeIterator hint,
 		Vector<Dim> const& position) {
-	bool contains = start.contains(position);
+	bool contains = hint.contains(position);
 	// If this node is childless and contains the point, then just return it.
-	if (contains && !start.hasChildren()) {
-		return start;
+	if (contains && !hint.hasChildren()) {
+		return hint;
 	}
 	// If it is childless but contains the point, then recursively call this
 	// method on the child that also conains the point.
-	else if (contains && start.hasChildren()) {
-		return find(start.child(position), position);
+	else if (contains && hint.hasChildren()) {
+		return find(hint.child(position), position);
 	}
 	// If it does not contain the point, then recursively call this method on
 	// the parent of this node.
-	else if (start.hasParent()) {
-		return find(start.parent(), position);
+	else if (hint.hasParent()) {
+		return find(hint.parent(), position);
 	}
 	return nodes().end();
 }
 
 template<typename L, typename N, std::size_t Dim>
 Octree<L, N, Dim>::NodeIterator Octree<L, N, Dim>::find(
-		ConstNodeIterator start,
+		ConstNodeIterator hint,
 		ConstLeafIterator leaf) {
-	bool contains = start.contains(leaf);
+	bool contains = hint.contains(leaf);
 	// If this node is childless and contains the leaf, then return itself.
-	if (contains && !start.hasChildren()) {
-		return start;
+	if (contains && !hint.hasChildren()) {
+		return hint;
 	}
 	// If it has children and contains the leaf, then recursively call this
 	// method on the child that contains the leaf.
 	else if (contains && node->hasChildren) {
-		return find(start.child(leaf), leaf);
+		return find(hint.child(leaf), leaf);
 	}
 	// If it doesn't contain the leaf, the recursively call this method on the
 	// parent of this node.
 	else if (node->hasParent) {
-		return find(start.parent(), leaf);
+		return find(hint.parent(), leaf);
 	}
 	return nodes().end();
 }

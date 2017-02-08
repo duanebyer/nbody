@@ -16,20 +16,17 @@ namespace nbody {
  * 
  * This class is a fairly standard implementation of an octree that stores data
  * at discrete points. In addition, this class allows for data to be stored at
- * the nodes of the octree (for example, the center of mass of all of the data
+ * the nodes of the Octree (for example, the center of mass of all of the data
  * points contained within a node).
  * 
- * The nested Leaf class is used to contain the discrete data points contained
- * within the Octree. The nested Node class contains the data associated with
- * the nodes themselves. In many ways, the Octree class can be thought of as a
- * container of both Leaf%s and Node%s, although only Leaf%s can be directly
- * added to the Octree.
+ * This class can be thought of as a pair of containers: one container of leaf
+ * data (see the LeafViewBase class), and another container of nodes (see the
+ * NodeViewBase class). These containers can be accessed using the Octree:leafs
+ * and Octree::nodes methods. Traversing the structure of the Octree can be done
+ * with the NodeIteratorBase and LeafIteratorBase classes.
  * 
- * When an Octree is created, it's possible to specify the maximum number of
- * Leaf%s that can be contained by a Node, as well as the maximum depth that the
- * Octree can reach. In addition, it's possible to choose whether the Octree
- * will automatically readjust its Node%s when one of the Node%s has too many
- * children, or whether the adjustments must be performed manually.
+ * Data can be added to or removed from the Octree through the Octree::insert,
+ * Octree::erase, and Octree::move methods.
  * 
  * \tparam L the type of data stored at the leaves of the Octree
  * \tparam N the type of data stored at the nodes of the Octree
@@ -39,6 +36,9 @@ template<typename L, typename N, std::size_t Dim>
 class Octree final {
 	
 private:
+	
+	// These private classes are used to construct const-variants and
+	// reverse-variants of the public range and iterator classes.
 	
 	template<bool Const, bool Reverse>
 	class LeafIteratorBase;	
@@ -54,12 +54,18 @@ private:
 	
 public:
 	
+	///@{
+	/**
+	 * \brief Pseudo-container that provides access to the leaves of the Octree
+	 * without allowing for insertion or deletion of elements.
+	 */
 	using LeafRange = LeafRangeBase<false>;
 	using ConstLeafRange = LeafRangeBase<true>;
+	///@}
 	
 	///@{
 	/**
-	 * \brief Depth-first iterator over all of the Leaf%s contained in the
+	 * \brief Depth-first iterator over all of the leaves contained in the
 	 * Octree.
 	 */
 	using LeafIterator = LeafIterator<false, false>;
@@ -68,12 +74,18 @@ public:
 	using ConstReverseLeafIterator = LeafIterator<true, true>;
 	///@}
 	
+	///@{
+	/**
+	 * \brief Pseudo-container that provides access to the nodes of the Octree
+	 * without allowing for insertion or deletion of elements.
+	 */
 	using NodeRange = NodeRangeBase<false>;
 	using ConstNodeRange = NodeRangeBase<true>;
+	///@}
 	
 	///@{
 	/**
-	 * \brief Depth-first iterator over all of the Node%s contained in the
+	 * \brief Depth-first iterator over all of the nodes contained in the
 	 * Octree.
 	 */
 	using NodeIterator = NodeIteratorBase<false, false>;
@@ -82,11 +94,12 @@ public:
 	using ConstReverseNodeIterator = NodeIteratorBase<true, true>;
 	///@}
 	
+private:
+	
 	using LeafList = std::vector<Leaf>;
 	using NodeList = std::vector<Node>;
 	
-private:
-	
+	// This class packages leaf data with a position.
 	struct Leaf final {
 		
 		L data;
@@ -99,6 +112,7 @@ private:
 		
 	};
 	
+	// This class packages node data within the node heirarchy.
 	struct Node final {
 		
 		// The depth of this node within the octree (0 for root, and so on).
@@ -134,6 +148,7 @@ private:
 		// The data stored at the node itself.
 		N data;
 		
+		// By default, a node is constructed as if it were an empty root node.
 		Node() :
 				depth(0),
 				hasChildren(false),
@@ -150,8 +165,7 @@ private:
 		
 	};
 	
-	// A list storing all of the leaves of the octree (it's spelled wrong for
-	// consistancy).
+	// A list storing all of the leafs of the octree.
 	LeafList _leafs;
 	
 	// A list storing all of the nodes of the octree.
@@ -201,11 +215,11 @@ public:
 	 * \param position { the location of the "upper-left" corner of the region
 	 * of space that the Octree covers }
 	 * \param dimensions the size of the region of space that the Octree covers
-	 * \param nodeCapacity { the number of Leaf%s that can be stored in
-	 * one Node }
-	 * \param maxDepth the maximum number of generations of Node%s
+	 * \param nodeCapacity { the number of leaves that can be stored at
+	 * one node }
+	 * \param maxDepth the maximum number of generations of nodes
 	 * \param adjust { whether the Octree should automatically create and
-	 * destroy Node%s }
+	 * destroy nodes to optimize the number of leaves per node }
 	 */
 	Octree(
 			Vector<Dim> position,
@@ -214,26 +228,46 @@ public:
 			std::size_t maxDepth = sizeof(Scalar) * CHAR_BIT,
 			bool adjust = true);
 	
+	///@{
+	/**
+	 * \brief Gets a pseudo-container that contains the leaves of the Octree.
+	 * 
+	 * The leaves are returned in depth-first order. See LeafRangeBase for
+	 * the API of the resulting container.
+	 */
 	LeafRange leafs();
 	ConstLeafRange leafs() const;
 	ConstLeafRange cleafs() const;
-	
-	NodeRange nodes();
-	ConstNodeRange nodes() const;
-	ConstNodeRange cnodes() const;
+	///@}
 	
 	///@{
 	/**
-	 * \brief Creates and destroys Node%s so that the Octree has the minimum
-	 * necessary Node%s to store all of the Leaf%s.
+	 * \brief Gets a pseudo-container that contains the nodes of the Octree.
 	 * 
-	 * This method takes all Node%s that have more Leaf%s than the capacity and
-	 * splits them into child Node%s to store the Leaf%s. It also merges
-	 * unnecessary Node%s with their siblings.
+	 * The nodes are returned in depth-first order, with the root node as the
+	 * first element in the container. See NodeRangeBase for the API of the
+	 * resulting container.
+	 */
+	NodeRange nodes();
+	ConstNodeRange nodes() const;
+	ConstNodeRange cnodes() const;
+	///@}
+	
+	///@{
+	/**
+	 * \brief Creates and destroys nodes to optimize the number of leaves stored
+	 * at each node.
 	 * 
-	 * NodeIterator%s and LeafIterator%s may be invalidated.
+	 * This method will check for nodes that contain more than the maximum
+	 * number of leaves, as well as for unnecessary nodes. The node structure
+	 * of the Octree will be adjusted so that these situations are resolved.
 	 * 
-	 * \param node the Node which will be adjusted (including children)
+	 * If the Octree was constructed to automatically adjust itself, then this
+	 * method will never do anything.
+	 * 
+	 * NodeIterator%s may be invalidated.
+	 * 
+	 * \param node an iterator to the node which will be adjusted
 	 * 
 	 * \return whether any changes were actually made
 	 */
@@ -245,25 +279,22 @@ public:
 	
 	///@{
 	/**
-	 * \brief Adds a new Leaf to the Octree.
+	 * \brief Adds a new leaf to the Octree.
 	 * 
-	 * The Octree will search for the appropriate node to which to add the Leaf.
-	 * The search starts at the optional Node parameter (if no parameter is
-	 * provided, then the search starts at the root). If the Leaf could not be
-	 * added (for instance, the position is out of range of the Octree), then
-	 * the past-the-end LeafIterator will be returned.
+	 * If the optional `hint` parameter is provided, then this method will begin
+	 * its search for the node to insert the leaf at the `hint` node.
 	 * 
 	 * NodeIterator%s and LeafIterator%s may be invalidated.
 	 * 
-	 * \param start a starting guess as to where the Leaf should be placed
-	 * \param data the actual data that will be stored at the Leaf
-	 * \param position the position of the Leaf
+	 * \param hint a starting guess as to where the leaf should be placed
+	 * \param data the data to be inserted at the leaf
+	 * \param position the position of the leaf
 	 * 
-	 * \return a tuple containing the NodeIterator to the Node that the
-	 * Leaf was added to, and a LeafIterator to the new Leaf
+	 * \return a tuple containing the NodeIterator to the node that the
+	 * leaf was added to, and a LeafIterator to the new leaf
 	 */
 	std::tuple<NodeIterator, LeafIterator> insert(
-			ConstNodeIterator start,
+			ConstNodeIterator hint,
 			L const& data,
 			Vector<Dim> const& position);
 	
@@ -274,22 +305,21 @@ public:
 	
 	///@{
 	/**
-	 * \brief Removes an Leaf from the Octree.
+	 * \brief Removes an leaf from the Octree.
 	 * 
-	 * The Octree will search for the appropriate node from which to remove the
-	 * Leaf. The search starts at the optional Node parameter (if no parameter
-	 * is provided, then the search starts at the root).
+	 * If the optional `hint` parameter is provided, then this method will begin
+	 * its search for the node to remove the leaf from at the `hint` node.
 	 * 
 	 * NodeIterator%s and LeafIterator%s may be invalidated.
 	 * 
-	 * \param start a starting guess as to where the Leaf should be removed from
-	 * \param leaf a LeafIterator to the Leaf that should be removed
+	 * \param hint a starting guess as to where the leaf should be removed from
+	 * \param leaf a LeafIterator to the leaf that should be removed
 	 * 
-	 * \return a tuple containing the NodeIterator that the Leaf was removed
-	 * from, and the LeafIterator following the removed Leaf
+	 * \return a tuple containing the NodeIterator that the leaf was removed
+	 * from, and the LeafIterator to the leaf after the removed leaf
 	 */
 	std::tuple<NodeIterator, LeafIterator> erase(
-			ConstNodeIterator start,
+			ConstNodeIterator hint,
 			LeafIterator leaf);
 	
 	std::tuple<NodeIterator, LeafIterator> erase(
@@ -298,23 +328,22 @@ public:
 	
 	///@{
 	/**
-	 * \brief Changes the position of a Leaf within the Octree.
+	 * \brief Changes the position of a leaf within the Octree.
 	 * 
-	 * The Octree will search for the appropriate nodes to move the Leaf
-	 * between. The search starts at the optional Node parameter (if no
-	 * parameter is provided, then the search starts at the root).
+	 * If the optional `hint` parameter is provided, then this method will begin
+	 * its search for the node to move the leaf from at the `hint` node.
 	 * 
-	 * Node Iterator%s and LeafIterator%s may be invalidated.
+	 * NodeIterator%s and LeafIterator%s may be invalidated.
 	 * 
-	 * \param start a starting guess as to where the Leaf should be moved
-	 * \param leaf a LeafIterator to the Leaf that should be moved
-	 * \param position the new position that the LeafIterator should be moved to
+	 * \param hint a starting guess as to where the leaf should be moved from
+	 * \param leaf a LeafIterator to the leaf that should be moved
+	 * \param position the new position that the leaf should be moved to
 	 * 
-	 * \return a tuple containing the NodeIterator that the Leaf was removed
+	 * \return a tuple containing the NodeIterator that the leaf was removed
 	 * from, the NodeIterator that it was moved to, and the LeafIterator itself
 	 */
 	std::tuple<NodeIterator, NodeIterator, LeafIterator> move(
-			ConstNodeIterator start,
+			ConstNodeIterator hint,
 			LeafIterator leaf,
 			Vector<Dim> const& position);
 	
@@ -325,20 +354,20 @@ public:
 	
 	///@{
 	/**
-	 * \brief Searches for the Node that contains a certain position.
+	 * \brief Searches for the node that contains a certain position.
 	 * 
-	 * This method searches for the unique Node that has no children and still
-	 * contains a given position. The search starts at the optional Node
-	 * parameter (if no parameter is provided, then the search starts at the
-	 * root).
+	 * This method searches for the lowest-level node that contains a position.
 	 * 
-	 * \param start an initial guess as to what Node contains the position
+	 * If the optional `hint` parameter is provided, then this method will begin
+	 * its search for the node at the `hint` node.
+	 * 
+	 * \param hint an initial guess as to what node contains the position
 	 * \param position the position to search for
 	 * 
-	 * \return the Node that contains the position
+	 * \return the node that contains the position
 	 */
 	NodeIterator find(
-			ConstNodeIterator start,
+			ConstNodeIterator hint,
 			Vector<Dim> const& position);
 	
 	NodeIterator find(
@@ -359,19 +388,20 @@ public:
 	
 	///@{
 	/**
-	 * \brief Searchs for the Node that contains a certain Leaf.
+	 * \brief Searchs for the node that contains a certain leaf.
 	 * 
-	 * This method searches for the unique Node that has no children and still
-	 * contains a given Leaf. The search starts at the optional Node parameter
-	 * (if no parameter is provided, then the search starts at the root).
+	 * This method searches for the lowest-level node that contains a leaf.
+	 * 
+	 * If the optional `hint` parameter is provided, then this method will begin
+	 * its search for the node at the `hint` node.
 	 * 
 	 * \param start an initial guess as to what Node contains the position
-	 * \param leaf the Leaf to search for
+	 * \param leaf the leaf to search for
 	 * 
-	 * \return the Node that contains the Leaf
+	 * \return the node that contains the leaf
 	 */
 	NodeIterator find(
-			ConstNodeIterator start,
+			ConstNodeIterator hint,
 			ConstLeafIterator leaf);
 	
 	NodeIterator find(
@@ -380,7 +410,7 @@ public:
 	}
 	
 	ConstNodeIterator find(
-			ConstNodeIterator start,
+			ConstNodeIterator hint,
 			ConstLeafIterator leaf) const {
 		return const_cast<Octree<L, N, Dim>*>(this)->find(start, leaf);
 	}
@@ -395,18 +425,42 @@ public:
 
 
 
+/**
+ * \brief An iterator over the LeafRangeBase container.
+ * 
+ * The leaves are iterated over in depth-first order.
+ * 
+ * This iterator meets the requirements of `RandomAccessIterator`. It also
+ * contains some simple functions for querying the properties of a leaf of an
+ * Octree.
+ * 
+ * \tparam Const whether this is a `const` variant of the iterator
+ * \tparam Reverse whether this is a reverse or forward iterator
+ */
 template<typename L, typename N, std::size_t Dim, bool Const, bool Reverse>
 class Octree<L, N, Dim>::LeafIteratorBase<Const, Reverse> final {
 	
 private:
 	
 	friend Octree<L, N, Dim>;
+	template<bool Const>
 	friend Octree<L, N, Dim>::LeafRangeBase<Const>;
+	template<bool Const>
+	friend Octree<L, N, Dim>::NodeIteratorBase<Const>;
 	
+	// These typedefs reference the underlying lists in the Octree class that
+	// actually store the leaves.
 	using Range = Octree<L, N, Dim>::LeafRange<Const>;
 	using List = Octree<L, N, Dim>::LeafList;
-	using ListIterator = List::iterator;
-	using ListReference = List::reference;
+	using ListIterator = std::conditional_t<
+			Const,
+			List::const_iterator,
+			List::iterator>;
+	using ListReference = std::conditional_t<
+			Const,
+			List::const_reference,
+			List::reference>;
+	
 	using OctreePointer = std::conditional_t<
 			Const,
 			Octree<L, N, Dim> const*,
@@ -420,6 +474,7 @@ private:
 			_index(index) {
 	}
 	
+	// These methods provide convenient access to the underlying list.
 	ListReference listRef() const {
 		return _octree->_leafs[_index];
 	}
@@ -429,6 +484,7 @@ private:
 	
 public:
 	
+	// Iterator typedefs.
 	using value_type = Range::value_type;
 	using reference = std::conditional_t<
 			Const,
@@ -445,15 +501,28 @@ public:
 	operator LeafIteratorBase<true, Reverse>() const {
 		return LeafIteratorBase<true, Reverse>(_octree, _index);
 	}
+	
+	/**
+	 * \brief Flips the direction of the iterator.
+	 * 
+	 * This method transforms a forward iterator into a reverse iterator, and a
+	 * reverse iterator into a forward iterator. Note that the resulting
+	 * does not point to the same value as the original iterator (same behaviour
+	 * as `std::reverse_iterator<...>::base()`).
+	 */
 	LeafIteratorBase<Const, !Reverse> reverse() const {
 		difference_type shift = !Reverse ? -1 : +1;
 		return LeafIteratorBase<Const, !Reverse>(_octree, _index + shift);
 	}
 	
+	/**
+	 * \brief Gets the position of the data pointed to by this iterator.
+	 */
 	Vector<Dim> const& position() const {
 		return listRef().position;
 	}
 	
+	// Iterator element access methods.
 	reference operator*() const {
 		return _octree->_leafs[index].data;
 	}
@@ -464,6 +533,7 @@ public:
 		return _octree->_leafs[index + n].data;
 	}
 	
+	// Iterator incrementing methods.
 	LeafIteratorBase<Const, Reverse>& operator++() {
 		difference_type shift = Reverse ? -1 : +1;
 		_index += shift;
@@ -497,6 +567,7 @@ public:
 		return *this;
 	}
 	
+	// Iterator arithmetic methods.
 	friend LeafIteratorBase<Const, Reverse> operator+(
 			LeafIteratorBase<Const, Reverse> it,
 			difference_type n) {
@@ -523,6 +594,7 @@ public:
 		return Reverse ? (rhs._index - lhs._index) : (lhs._index - rhs._index);
 	}
 	
+	// Iterator comparison methods.
 	friend bool operator==(
 			LeafIteratorBase<Const, Reverse> const& lhs,
 			LeafIteratorBase<Const, Reverse> const& rhs) {
@@ -558,10 +630,27 @@ public:
 
 
 
+/**
+ * \brief A pseudo-container that provides access to a collection of leaves
+ * from an Octree.
+ * 
+ * The leaves are stored in depth-first order.
+ * 
+ * This container partially meets the requirements of `SequenceContainer` and
+ * `ReversibleContainer`. The only differences in behaviour arise because
+ * elements cannot be added to or removed from this container. In addition, this
+ * container cannot be created, but must be retrieved using the Octree class.
+ * 
+ * \tparam Const whether this container allows for modifying its elements
+ */
 template<typename L, typename N, std::size_t Dim, bool Const>
 class Octree<L, N, Dim>::LeafRangeBase<Const> final {
 	
 private:
+	
+	friend Octree<L, N, Dim>;
+	template<bool Const, bool Reverse>
+	friend Octree<L, N, Dim>::NodeIteratorBase<Const, Reverse>;
 	
 	using OctreePointer = std::conditional_t<
 			Const,
@@ -583,6 +672,7 @@ private:
 	
 public:
 	
+	// Container typedefs.
 	using value_type = L;
 	using reference = L&;
 	using const_reference = L const&;
@@ -599,6 +689,7 @@ public:
 		return LeafRangeBase<true>(_octree, _lowerIndex, _upperIndex);
 	}
 	
+	// Container iteration range methods.
 	std::conditional_t<Const, const_iterator, iterator> begin() const {
 		return std::conditional_t<
 			Const,
@@ -647,6 +738,7 @@ public:
 		return const_reverse_iterator(_octree, _lowerIndex - 1);
 	}
 	
+	// Container size methods.
 	size_type size() const {
 		return _upperIndex - _lowerIndex;
 	}
@@ -657,6 +749,7 @@ public:
 		return _upperIndex == _lowerIndex;
 	}
 	
+	// Container element access methods.
 	std::conditional_t<Const, const_reference, reference> front() const {
 		return _octree->_leafs[_lowerIndex].data;
 	}
@@ -677,21 +770,43 @@ public:
 
 
 
+/**
+ * \brief An iterator over the NodeRangeBase container.
+ * 
+ * The nodes are iterated over in depth-first order.
+ * 
+ * This iterator meets the requirements of `RandomAccessIterator`. It also
+ * contains some simple functions for querying the properties of a node of an
+ * Octree.
+ * 
+ * \tparam Const whether this is a `const` variant of the iterator
+ * \tparam Reverse whether this is a reverse or forward iterator
+ */
 template<
 		typename L, typename N, std::size_t Dim,
 		bool Const,
 		bool Reverse>
-class Octree<L, N, Dim>::NodeIteratorBase<Const, Reverse> {
+class Octree<L, N, Dim>::NodeIteratorBase<Const, Reverse> final {
 	
 private:
 	
 	friend Octree<L, N, Dim>;
+	template<bool Const>
 	friend Octree<L, N, Dim>::NodeRange<Const>;
 	
+	// These typedefs reference the underlying lists in the Octree class that
+	// actually store the nodes.
 	using Range = Octree<L, N, Dim>::NodeRange<Const>;
 	using List = Octree<L, N, Dim>::NodeList;
-	using ListIterator = List::iterator;
-	using ListReference = List::reference;
+	using ListIterator = std::conditional_t<
+			Const,
+			List::const_iterator,
+			List::iterator>;
+	using ListReference = std::conditional_t<
+			Const,
+			List::const_reference,
+			List::reference>;
+	
 	using OctreePointer = std::conditional_t<
 			Const,
 			Octree<L, N, Dim> const*,
@@ -918,9 +1033,11 @@ public:
 template<
 		typename L, typename N, std::size_t Dim,
 		bool Const>
-class Octree<L, N, Dim>::NodeRangeBase<Const> {
+class Octree<L, N, Dim>::NodeRangeBase<Const> final {
 	
 private:
+	
+	friend Octree<L, N, Dim>;
 	
 	using OctreePointer = std::conditional_t<
 			Const,
