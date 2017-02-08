@@ -533,7 +533,7 @@ public:
 		return _octree->_leafs[index + n].data;
 	}
 	
-	// Iterator incrementing methods.
+	// Iterator increment methods.
 	LeafIteratorBase<Const, Reverse>& operator++() {
 		difference_type shift = Reverse ? -1 : +1;
 		_index += shift;
@@ -820,6 +820,7 @@ private:
 			_index(index) {
 	}
 	
+	// These methods provide convenient access to the underlying list.
 	ListReference listRef() const {
 		return _octree->_nodes[_index];
 	}
@@ -829,6 +830,7 @@ private:
 	
 public:
 	
+	// Iterator typedefs.
 	using value_type = Range::value_type;
 	using reference = std::conditional_t<
 			Const,
@@ -845,6 +847,15 @@ public:
 	operator NodeIteratorBase<true, Reverse>() const {
 		return NodeIteratorBase<true, Reverse>(_octree, _index);
 	}
+	
+	/**
+	 * \brief Flips the direction of the iterator.
+	 * 
+	 * This method transforms a forward iterator into a reverse iterator, and a
+	 * reverse iterator into a forward iterator. Note that the resulting
+	 * does not point to the same value as the original iterator (same behaviour
+	 * as `std::reverse_iterator<...>::base()`).
+	 */
 	NodeIteratorBase<Const, !Reverse> reverse() const {
 		difference_type shift = !Reverse ? -1 : +1;
 		return NodeIteratorBase<Const, !Reverse>(
@@ -852,12 +863,23 @@ public:
 			_index + shift);
 	}
 	
+	/**
+	 * \brief Gets the "upper-left" corner of the node pointed to by this
+	 * iterator.
+	 */
 	Vector<Dim> const& position() const {
 		return listRef().position;
 	}
+	/**
+	 * \brief Gets the size of the node pointed to by this iterator.
+	 */
 	Vector<Dim> const& dimensions() const {
 		return listRef().dimensions;
 	}
+	/**
+	 * \brief Returns whether a certain point is contained within the node
+	 * pointed to by this iterator.
+	 */
 	bool contains(Vector<Dim> const& point) const {
 		for (std::size_t dim = 0; dim < Dim; ++dim) {
 			if (!(
@@ -868,11 +890,19 @@ public:
 		}
 		return true;
 	}
+	/**
+	 * \brief Returns whether a certain leaf is contained within the node
+	 * pointed to by this iterator.
+	 */
 	bool contains(Octree<L, N, Dim>::ConstLeafIterator leaf) const {
 		return
 			leaf._index >= listRef().leafIndex &&
 			leaf._index < listRef().leafIndex + listRef().leafCount;
 	}
+	/**
+	 * \brief Returns whether the node is able to hold a certain number of
+	 * additional leaves without being over capacity.
+	 */
 	bool canHoldLeafs(
 			Octree<L, N, Dim>::LeafRange::difference_type n = 0) const {
 		return
@@ -880,24 +910,56 @@ public:
 			listRef().depth >= _octree->_maxDepth;
 	}
 	
+	/**
+	 * \brief Returns whether this node has a parent.
+	 * 
+	 * If this method returns false, then the node must be the root of the
+	 * Octree.
+	 */
 	bool hasParent() const {
 		return listRef().hasParent;
 	}
+	/**
+	 * \brief Gets an iterator pointing to the parent of this node.
+	 * 
+	 * If this node has no parent (that is, this node is the root node), then
+	 * the result is undefined.
+	 */
 	NodeIteratorBase<Const, Reverse> parent() const {
 		return NodeIteratorBase<Const, Reverse>(
 			_octree,
 			_index + listRef().parentIndex);
 	}
 	
+	/**
+	 * \brief Returns whether this node has any children.
+	 */
 	bool hasChildren() const {
 		return listRef().hasChildren;
 	}
+	/**
+	 * \brief Returns one of the children of this node by index.
+	 * 
+	 * By default, a node has either `2 ** Dim` or `0` children. If this node
+	 * has no children, then the result is undefined.
+	 * 
+	 * \param childIndex the index of the child to return
+	 */
 	NodeIteratorBase<Const, Reverse> child(
 			size_type childIndex) const {
 		return NodeIteratorBase<Const, Reverse>(
 			_octree,
 			_index + listRef().childIndices[childIndex]);
 	}
+	/**
+	 * \brief Returns one of the children of this node by position.
+	 * 
+	 * This method returns the child of this node that contains the given point.
+	 * If the point is outside of the bounds of the current node, then it is
+	 * automatically normalized to be within the bounds.
+	 * 
+	 * \param point the position contained by the child to return
+	 */
 	NodeIteratorBase<Const, Reverse> child(
 			Vector<Dim> point) const {
 		size_type childIndex = 0;
@@ -908,6 +970,16 @@ public:
 		}
 		return child(childIndex);
 	}
+	/**
+	 * \brief Returns one of the children of this node by the leaf that it
+	 * contains.
+	 * 
+	 * This method returns the child of this node that contains the given leaf.
+	 * If the leaf is not contained within the current node, then the result is
+	 * the past-the-end iterator of the Octree::nodes() container.
+	 * 
+	 * \param leaf an iterator to the leaf contained by the child to return
+	 */
 	NodeIteratorBase<Const, Reverse> child(
 			ConstLeafIterator leaf) const {
 		for (size_type childIndex = 0; childIndex < (1 << Dim); ++childIndex) {
@@ -916,16 +988,25 @@ public:
 				return child;
 			}
 		}
-		return
-			Reverse ?
-			_octree->nodes().rend() :
-			_octree->nodes().end();
+		return _octree->nodes().end();
 	}
 	
+	/**
+	 * \brief Returns a list of all of the descendants of this node, but not
+	 * including this node itself.
+	 */
 	NodeRangeBase<Const> children() const;
+	/**
+	 * \brief Returns a list containing this node as well as all of its
+	 * descendants.
+	 */
 	NodeRangeBase<Const> nodes() const;
+	/**
+	 * \brief Returns a list of all of the leaves contained within this node.
+	 */
 	LeafRangeBase<Const> leafs() const;
 	
+	// Iterator element access methods.
 	reference operator*() const {
 		return _octree->_nodes[_index].data;
 	}
@@ -936,6 +1017,7 @@ public:
 		return _octree->_nodes[_index + n].data;
 	}
 	
+	// Iterator increment methods.
 	NodeIteratorBase<Const, Reverse>& operator++() {
 		difference_type shift = Reverse ? -1 : +1;
 		_index += shift;
@@ -969,6 +1051,7 @@ public:
 		return *this;
 	}
 	
+	// Iterator arithmetic methods.
 	friend NodeIteratorBase<Const, Reverse> operator+(
 			NodeIteratorBase<Const, Reverse> it,
 			difference_type n) {
@@ -995,6 +1078,7 @@ public:
 		return Reverse ? rhs._index - lhs._index : lhs._index - rhs._index;
 	}
 	
+	// Iterator comparison methods.
 	friend bool operator==(
 			NodeIteratorBase<Const, Reverse> const& lhs,
 			NodeIteratorBase<Const, Reverse> const& rhs) {
@@ -1030,6 +1114,19 @@ public:
 
 
 
+/**
+ * \brief A pseudo-container that provides access to a collection of nodes
+ * from an Octree.
+ * 
+ * The nodes are stored in depth-first order.
+ * 
+ * This container partially meets the requirements of `SequenceContainer` and
+ * `ReversibleContainer`. The only differences in behaviour arise because
+ * elements cannot be added to or removed from this container. In addition, this
+ * container cannot be created, but must be retrieved using the Octree class.
+ * 
+ * \tparam Const whether this container allows for modifying its elements
+ */
 template<
 		typename L, typename N, std::size_t Dim,
 		bool Const>
@@ -1059,6 +1156,7 @@ private:
 	
 public:
 	
+	// Container typedefs.
 	using value_type = N;
 	using reference = N&;
 	using const_reference = N const&;
@@ -1079,6 +1177,7 @@ public:
 		return NodeRangeBase<true>(_octree, _lowerIndex, _upperIndex);
 	}
 	
+	// Container iteration range methods.
 	std::conditional_t<Const, const_iterator, iterator> begin() const {
 		return std::conditional_t<
 			Const,
@@ -1129,6 +1228,7 @@ public:
 		return const_reverse_iterator(_octree, _lowerIndex - 1);
 	}
 	
+	// Container size methods.
 	size_type size() const {
 		return _upperIndex - _lowerIndex;
 	}
@@ -1139,6 +1239,7 @@ public:
 		return _upperIndex == _lowerIndex;
 	}
 	
+	// Container element access methods.
 	std::conditional_t<Const, const_reference, reference> front() const {
 		return _octree->_nodes[_lowerIndex].data;
 	}
