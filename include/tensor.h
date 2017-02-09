@@ -2,6 +2,8 @@
 #define __NBODY_TENSOR_H_
 
 #include <cstddef>
+#include <initializer_list>
+#include <iterator>
 #include <type_traits>
 
 namespace nbody {
@@ -70,12 +72,15 @@ public:
 	 */
 	using Array = typename PrevTensor::Array[Dim];
 	
+	static const std::size_t size = Dim * PrevTensor::size;
+	
 	/**
 	 * \brief Initializes a Tensor to the zero value.
 	 */
 	Tensor() {
 	}
 	
+	///@{
 	/**
 	 * \brief Initializes a Tensor with the specified coordinates.
 	 * 
@@ -85,6 +90,31 @@ public:
 		for (std::size_t index = 0; index < Dim; ++index) {
 			PrevTensor tensor(values[index]);
 			_values[index] = tensor;
+		}
+	}
+	
+	Tensor(std::initializer_list<Scalar> values) :
+			Tensor(values.begin(), values.end()) {
+	}
+	///@}
+	
+	/**
+	 * \brief Initializes a Tensor with the specified coordinates.
+	 * 
+	 * \tparam It any `RandomAccessIterator`
+	 * \param begin the start of the range of values
+	 * \param end the end of the range of values
+	 */
+	template<typename It>
+	Tensor(It begin, It end) {
+		for (std::size_t index = 0; index < Dim; ++index) {
+			PrevTensor tensor(begin, end);
+			if ((std::size_t) (end - begin) >= PrevTensor::size) {
+				begin += PrevTensor::size;
+			}
+			else {
+				begin = end;
+			}
 		}
 	}
 	
@@ -144,10 +174,17 @@ public:
 	
 	using Array = Scalar;
 	
+	static const std::size_t size = 1;
+	
 	Tensor() : _value(0) {
 	}
 	
 	Tensor(Scalar value): _value(value) {
+	}
+	
+	template<typename It>
+	Tensor(It begin, It end) {
+		_value = begin == end ? 0 : *begin;
 	}
 	
 	operator Scalar&() {
