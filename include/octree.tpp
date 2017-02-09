@@ -32,8 +32,8 @@ Octree<L, N, Dim>::Octree(
 	leafs.insert(leafs.begin(), root);
 }
 
-template<typename L, typename N, typename Dim>
-Octree<L, N, Dim>::NodeIterator Octree<L, N, Dim>::createChildren(
+template<typename L, typename N, std::size_t Dim>
+typename Octree<L, N, Dim>::NodeIterator Octree<L, N, Dim>::createChildren(
 		ConstNodeIterator node) {
 	// Create the 2^Dim child nodes inside the list of nodes. This will not
 	// invalidate the node iterator.
@@ -46,7 +46,7 @@ Octree<L, N, Dim>::NodeIterator Octree<L, N, Dim>::createChildren(
 		Node& child = *(node.listIt() + index + 1);
 		child.depth = node.listRef().depth + 1;
 		child.hasParent = true;
-		child.parentIndex = -((NodeRange::difference_type) index + 1);
+		child.parentIndex = -((typename NodeRange::difference_type) index + 1);
 		child.siblingIndex = index;
 		child.leafIndex = node.listRef().leafIndex + node.listRef().leafCount;
 		child.dimensions = childDimensions;
@@ -94,7 +94,7 @@ Octree<L, N, Dim>::NodeIterator Octree<L, N, Dim>::createChildren(
 }
 
 template<typename L, typename N, std::size_t Dim>
-Octree<L, N, Dim>::NodeIterator Octree<L, N, Dim>::destroyChildren(
+typename Octree<L, N, Dim>::NodeIterator Octree<L, N, Dim>::destroyChildren(
 		ConstNodeIterator node) {
 	// Determine how many children, grandchildren, great-grandchildren, ...
 	// of this node.
@@ -123,7 +123,7 @@ Octree<L, N, Dim>::NodeIterator Octree<L, N, Dim>::destroyChildren(
 }
 
 template<typename L, typename N, std::size_t Dim>
-Octree<L, N, Dim>::LeafIterator Octree<L, N, Dim>::insertAt(
+typename Octree<L, N, Dim>::LeafIterator Octree<L, N, Dim>::insertAt(
 		ConstNodeIterator node,
 		Leaf const& leaf) {
 	// Add the leaf to the master list of leaves in the octree.
@@ -147,7 +147,7 @@ Octree<L, N, Dim>::LeafIterator Octree<L, N, Dim>::insertAt(
 }
 
 template<typename L, typename N, std::size_t Dim>
-Octree<L, N, Dim>::LeafIterator Octree<L, N, Dim>::eraseAt(
+typename Octree<L, N, Dim>::LeafIterator Octree<L, N, Dim>::eraseAt(
 		ConstNodeIterator node,
 		ConstLeafIterator leaf) {
 	// Remove the leaf from the master octree leaf vector.
@@ -172,7 +172,7 @@ Octree<L, N, Dim>::LeafIterator Octree<L, N, Dim>::eraseAt(
 }
 
 template<typename L, typename N, std::size_t Dim>
-Octree<L, N, Dim>::LeafIterator Octree<L, N, Dim>::moveAt(
+typename Octree<L, N, Dim>::LeafIterator Octree<L, N, Dim>::moveAt(
 		ConstNodeIterator sourceNode,
 		ConstNodeIterator destNode,
 		ConstLeafIterator sourceLeaf) {
@@ -215,32 +215,32 @@ Octree<L, N, Dim>::LeafIterator Octree<L, N, Dim>::moveAt(
 }
 
 template<typename L, typename N, std::size_t Dim>
-Octree<L, N, Dim>::LeafRange Octree<L, N, Dim>::leafs() {
+typename Octree<L, N, Dim>::LeafRange Octree<L, N, Dim>::leafs() {
 	return LeafRange(this, 0, _leafs.size());
 }
 
 template<typename L, typename N, std::size_t Dim>
-Octree<L, N, Dim>::ConstLeafRange Octree<L, N, Dim>::leafs() const {
+typename Octree<L, N, Dim>::ConstLeafRange Octree<L, N, Dim>::leafs() const {
 	return ConstLeafRange(this, 0, _leafs.size());
 }
 
 template<typename L, typename N, std::size_t Dim>
-Octree<L, N, Dim>::ConstLeafRange Octree<L, N, Dim>::cleafs() const {
+typename Octree<L, N, Dim>::ConstLeafRange Octree<L, N, Dim>::cleafs() const {
 	return ConstLeafRange(this, 0, _leafs.size());
 }
 
 template<typename L, typename N, std::size_t Dim>
-Octree<L, N, Dim>::NodeRange Octree<L, N, Dim>::nodes() {
+typename Octree<L, N, Dim>::NodeRange Octree<L, N, Dim>::nodes() {
 	return NodeRange(this, 0, _nodes.size());
 }
 
 template<typename L, typename N, std::size_t Dim>
-Octree<L, N, Dim>::ConstNodeRange Octree<L, N, Dim>::nodes() const {
+typename Octree<L, N, Dim>::ConstNodeRange Octree<L, N, Dim>::nodes() const {
 	return ConstNodeRange(this, 0, _nodes.size());
 }
 
 template<typename L, typename N, std::size_t Dim>
-Octree<L, N, Dim>::ConstNodeRange Octree<L, N, Dim>::cnodes() const {
+typename Octree<L, N, Dim>::ConstNodeRange Octree<L, N, Dim>::cnodes() const {
 	return ConstNodeRange(this, 0, _nodes.size());
 }
 
@@ -271,8 +271,8 @@ bool Octree<L, N, Dim>::adjust(
 
 template<typename L, typename N, std::size_t Dim>
 std::tuple<
-		Octree<L, N, Dim>::NodeIterator,
-		Octree<L, N, Dim>::LeafIterator>
+		typename Octree<L, N, Dim>::NodeIterator,
+		typename Octree<L, N, Dim>::LeafIterator>
 Octree<L, N, Dim>::insert(
 		ConstNodeIterator hint,
 		L const& data,
@@ -295,18 +295,18 @@ Octree<L, N, Dim>::insert(
 
 template<typename L, typename N, std::size_t Dim>
 std::tuple<
-		Octree<L, N, Dim>::NodeIterator,
-		Octree<L, N, Dim>::LeafIterator>
+		typename Octree<L, N, Dim>::NodeIterator,
+		typename Octree<L, N, Dim>::LeafIterator>
 Octree<L, N, Dim>::insert(
 		L const& data,
 		Vector<Dim> const& position) {
-	return insert(root(), data, position);
+	return insert(nodes().front(), data, position);
 }
 
 template<typename L, typename N, std::size_t Dim>
 std::tuple<
-		Octree<L, N, Dim>::NodeIterator,
-		Octree<L, N, Dim>::LeafIterator>
+		typename Octree<L, N, Dim>::NodeIterator,
+		typename Octree<L, N, Dim>::LeafIterator>
 Octree<L, N, Dim>::erase(
 		ConstNodeIterator hint,
 		LeafIterator leaf) {
@@ -329,18 +329,18 @@ Octree<L, N, Dim>::erase(
 
 template<typename L, typename N, std::size_t Dim>
 std::tuple<
-		Octree<L, N, Dim>::NodeIterator,
-		Octree<L, N, Dim>::LeafIterator>
+		typename Octree<L, N, Dim>::NodeIterator,
+		typename Octree<L, N, Dim>::LeafIterator>
 Octree<L, N, Dim>::erase(
 		LeafIterator leaf) {
-	return erase(root(), leaf);
+	return erase(nodes().root(), leaf);
 }
 
 template<typename L, typename N, std::size_t Dim>
 std::tuple<
-		Octree<L, N, Dim>::NodeIterator,
-		Octree<L, N, Dim>::NodeIterator,
-		Octree<L, N, Dim>::LeafIterator>
+		typename Octree<L, N, Dim>::NodeIterator,
+		typename Octree<L, N, Dim>::NodeIterator,
+		typename Octree<L, N, Dim>::LeafIterator>
 Octree<L, N, Dim>::move(
 		ConstNodeIterator hint,
 		LeafIterator leaf,
@@ -380,33 +380,17 @@ Octree<L, N, Dim>::move(
 
 template<typename L, typename N, std::size_t Dim>
 std::tuple<
-		Octree<L, N, Dim>::NodeIterator,
-		Octree<L, N, Dim>::NodeIterator,
-		Octree<L, N, Dim>::LeafIterator>
+		typename Octree<L, N, Dim>::NodeIterator,
+		typename Octree<L, N, Dim>::NodeIterator,
+		typename Octree<L, N, Dim>::LeafIterator>
 Octree<L, N, Dim>::move(
 		LeafIterator leaf,
 		Vector<Dim> const& position) {
-	return move(root(), leaf, position);
+	return move(nodes().root(), leaf, position);
 }
 
-/*
 template<typename L, typename N, std::size_t Dim>
-bool contains(ConstNodeIterator node, Vector<Dim> const& point) {
-	Vector<Dim> lower = node->position;
-	Vector<Dim> upper = node->position + node->dimensions;
-	for (std::size_t dim = 0; dim < Dim; ++dim) {
-		// De Morgan's law has been applied here so that NaN is dealt with
-		// appropriately.
-		if (!(point[dim] >= lower[dim] && point[dim] < upper[dim])) {
-			return false;
-		}
-	}
-	return true;
-}
-*/
-
-template<typename L, typename N, std::size_t Dim>
-Octree<L, N, Dim>::NodeIterator Octree<L, N, Dim>::find(
+typename Octree<L, N, Dim>::NodeIterator Octree<L, N, Dim>::find(
 		ConstNodeIterator hint,
 		Vector<Dim> const& position) {
 	bool contains = hint.contains(position);
@@ -428,7 +412,7 @@ Octree<L, N, Dim>::NodeIterator Octree<L, N, Dim>::find(
 }
 
 template<typename L, typename N, std::size_t Dim>
-Octree<L, N, Dim>::NodeIterator Octree<L, N, Dim>::find(
+typename Octree<L, N, Dim>::NodeIterator Octree<L, N, Dim>::find(
 		ConstNodeIterator hint,
 		ConstLeafIterator leaf) {
 	bool contains = hint.contains(leaf);
@@ -438,12 +422,12 @@ Octree<L, N, Dim>::NodeIterator Octree<L, N, Dim>::find(
 	}
 	// If it has children and contains the leaf, then recursively call this
 	// method on the child that contains the leaf.
-	else if (contains && node->hasChildren) {
+	else if (contains && hint.hasChildren()) {
 		return find(hint.child(leaf), leaf);
 	}
 	// If it doesn't contain the leaf, the recursively call this method on the
 	// parent of this node.
-	else if (node->hasParent) {
+	else if (hint.hasParent()) {
 		return find(hint.parent(), leaf);
 	}
 	return nodes().end();
@@ -455,8 +439,8 @@ Octree<L, N, Dim>::NodeIterator Octree<L, N, Dim>::find(
 
 template<typename L, typename N, std::size_t Dim>
 template<bool Const, bool Reverse>
-Octree<L, N, Dim>::NodeRangeBase<Const>
-Octree<L, N, Dim>::NodeIteratorBase<Const, Reverse> children() const {
+typename Octree<L, N, Dim>::template NodeRangeBase<Const>
+Octree<L, N, Dim>::NodeIteratorBase<Const, Reverse>::children() const {
 	return NodeRangeBase<Const>(
 		_octree,
 		_index + listRef().childIndices[0],
@@ -465,8 +449,8 @@ Octree<L, N, Dim>::NodeIteratorBase<Const, Reverse> children() const {
 
 template<typename L, typename N, std::size_t Dim>
 template<bool Const, bool Reverse>
-Octree<L, N, Dim>::NodeRangeBase<Const>
-Octree<L, N, Dim>::NodeIteratorBase<Const, Reverse> nodes() const {
+typename Octree<L, N, Dim>::template NodeRangeBase<Const>
+Octree<L, N, Dim>::NodeIteratorBase<Const, Reverse>::nodes() const {
 	return NodeRangeBase<Const>(
 		_octree,
 		_index,
@@ -475,8 +459,8 @@ Octree<L, N, Dim>::NodeIteratorBase<Const, Reverse> nodes() const {
 
 template<typename L, typename N, std::size_t Dim>
 template<bool Const, bool Reverse>
-Octree<L, N, Dim>::LeafRangeBase<Const>
-Octree<L, N, Dim>::NodeIteratorBase<Const, Reverse> leafs() const {
+typename Octree<L, N, Dim>::template LeafRangeBase<Const>
+Octree<L, N, Dim>::NodeIteratorBase<Const, Reverse>::leafs() const {
 	return LeafRangeBase<Const>(
 		_octree,
 		listRef().leafIndex,

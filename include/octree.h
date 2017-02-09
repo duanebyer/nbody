@@ -8,6 +8,8 @@
 #include <type_traits>
 #include <vector>
 
+#include "tensor.h"
+
 namespace nbody {
 
 /**
@@ -68,10 +70,10 @@ public:
 	 * \brief Depth-first iterator over all of the leaves contained in the
 	 * Octree.
 	 */
-	using LeafIterator = LeafIterator<false, false>;
-	using ConstLeafIterator = LeafIterator<true, false>;
-	using ReverseLeafIterator = LeafIterator<false, true>;
-	using ConstReverseLeafIterator = LeafIterator<true, true>;
+	using LeafIterator = LeafIteratorBase<false, false>;
+	using ConstLeafIterator = LeafIteratorBase<true, false>;
+	using ReverseLeafIterator = LeafIteratorBase<false, true>;
+	using ConstReverseLeafIterator = LeafIteratorBase<true, true>;
 	///@}
 	
 	///@{
@@ -96,6 +98,9 @@ public:
 	
 private:
 	
+	struct Leaf;
+	struct Node;
+	
 	using LeafList = std::vector<Leaf>;
 	using NodeList = std::vector<Node>;
 	
@@ -105,7 +110,7 @@ private:
 		L data;
 		Vector<Dim> position;
 		
-		Node(L data, Vector<Dim> position) :
+		Leaf(L data, Vector<Dim> position) :
 				data(data),
 				position(position) {
 		}
@@ -373,6 +378,7 @@ public:
 	NodeIterator find(
 			Vector<Dim> const& position) {
 		return find(nodes().begin(), position);
+	}
 	
 	ConstNodeIterator find(
 			ConstNodeIterator start,
@@ -412,7 +418,7 @@ public:
 	ConstNodeIterator find(
 			ConstNodeIterator hint,
 			ConstLeafIterator leaf) const {
-		return const_cast<Octree<L, N, Dim>*>(this)->find(start, leaf);
+		return const_cast<Octree<L, N, Dim>*>(this)->find(hint, leaf);
 	}
 	
 	ConstNodeIterator find(
@@ -437,29 +443,30 @@ public:
  * \tparam Const whether this is a `const` variant of the iterator
  * \tparam Reverse whether this is a reverse or forward iterator
  */
-template<typename L, typename N, std::size_t Dim, bool Const, bool Reverse>
-class Octree<L, N, Dim>::LeafIteratorBase<Const, Reverse> final {
+template<typename L, typename N, std::size_t Dim>
+template<bool Const, bool Reverse>
+class Octree<L, N, Dim>::LeafIteratorBase final {
 	
 private:
 	
 	friend Octree<L, N, Dim>;
-	template<bool Const>
-	friend Octree<L, N, Dim>::LeafRangeBase<Const>;
-	template<bool Const>
-	friend Octree<L, N, Dim>::NodeIteratorBase<Const>;
+	template<bool Const_>
+	friend class Octree<L, N, Dim>::LeafRangeBase;
+	template<bool Const_, bool Reverse_>
+	friend class Octree<L, N, Dim>::NodeIteratorBase;
 	
 	// These typedefs reference the underlying lists in the Octree class that
 	// actually store the leaves.
-	using Range = Octree<L, N, Dim>::LeafRange<Const>;
+	using Range = Octree<L, N, Dim>::LeafRangeBase<Const>;
 	using List = Octree<L, N, Dim>::LeafList;
 	using ListIterator = std::conditional_t<
 			Const,
-			List::const_iterator,
-			List::iterator>;
+			typename List::const_iterator,
+			typename List::iterator>;
 	using ListReference = std::conditional_t<
 			Const,
-			List::const_reference,
-			List::reference>;
+			typename List::const_reference,
+			typename List::reference>;
 	
 	using OctreePointer = std::conditional_t<
 			Const,
@@ -467,9 +474,11 @@ private:
 			Octree<L, N, Dim>*>;
 	
 	OctreePointer const _octree;
-	Range::difference_type _index;
+	typename Range::difference_type _index;
 	
-	LeafIteratorBase(OctreePointer octree, Range::difference_type index) :
+	LeafIteratorBase(
+			OctreePointer octree,
+			typename Range::difference_type index) :
 			_octree(octree),
 			_index(index) {
 	}
@@ -485,17 +494,17 @@ private:
 public:
 	
 	// Iterator typedefs.
-	using value_type = Range::value_type;
+	using value_type = typename Range::value_type;
 	using reference = std::conditional_t<
 			Const,
-			Range::const_reference,
-			Range::reference>;
+			typename Range::const_reference,
+			typename Range::reference>;
 	using pointer = std::conditional_t<
 			Const,
-			Range::const_pointer,
-			Range::pointer>;
-	using size_type = Range::size_type;
-	using difference_type = Range::difference_type;
+			typename Range::const_pointer,
+			typename Range::pointer>;
+	using size_type = typename Range::size_type;
+	using difference_type = typename Range::difference_type;
 	using iterator_category = std::random_access_iterator_tag;
 	
 	operator LeafIteratorBase<true, Reverse>() const {
@@ -524,13 +533,13 @@ public:
 	
 	// Iterator element access methods.
 	reference operator*() const {
-		return _octree->_leafs[index].data;
+		return _octree->_leafs[_index].data;
 	}
 	pointer operator->() const {
-		return &_octree->_leafs[index].data;
+		return &_octree->_leafs[_index].data;
 	}
 	reference operator[](difference_type n) const {
-		return _octree->_leafs[index + n].data;
+		return _octree->_leafs[_index + n].data;
 	}
 	
 	// Iterator increment methods.
@@ -571,9 +580,8 @@ public:
 	friend LeafIteratorBase<Const, Reverse> operator+(
 			LeafIteratorBase<Const, Reverse> it,
 			difference_type n) {
-		LeafIteratorBase<Const, Reverse> result = *this;
-		result += n;
-		return result;
+		it += n;
+		return it;
 	}
 	friend LeafIteratorBase<Const, Reverse> operator+(
 			difference_type n,
@@ -583,9 +591,8 @@ public:
 	friend LeafIteratorBase<Const, Reverse> operator-(
 			LeafIteratorBase<Const, Reverse> it,
 			difference_type n) {
-		LeafIteratorBase<Const, Reverse> result = *this;
-		result -= n;
-		return result;
+		it -= n;
+		return it;
 	}
 	
 	friend difference_type operator-(
@@ -643,14 +650,15 @@ public:
  * 
  * \tparam Const whether this container allows for modifying its elements
  */
-template<typename L, typename N, std::size_t Dim, bool Const>
-class Octree<L, N, Dim>::LeafRangeBase<Const> final {
+template<typename L, typename N, std::size_t Dim>
+template<bool Const>
+class Octree<L, N, Dim>::LeafRangeBase final {
 	
 private:
 	
 	friend Octree<L, N, Dim>;
-	template<bool Const, bool Reverse>
-	friend Octree<L, N, Dim>::NodeIteratorBase<Const, Reverse>;
+	template<bool Const_, bool Reverse_>
+	friend class Octree<L, N, Dim>::NodeIteratorBase;
 	
 	using OctreePointer = std::conditional_t<
 			Const,
@@ -677,7 +685,7 @@ public:
 	using reference = L&;
 	using const_reference = L const&;
 	using pointer = L*;
-	using pointer = L const*;
+	using const_pointer = L const*;
 	using iterator = Octree<L, N, Dim>::LeafIterator;
 	using const_iterator = Octree<L, N, Dim>::ConstLeafIterator;
 	using reverse_iterator = Octree<L, N, Dim>::ReverseLeafIterator;
@@ -782,30 +790,28 @@ public:
  * \tparam Const whether this is a `const` variant of the iterator
  * \tparam Reverse whether this is a reverse or forward iterator
  */
-template<
-		typename L, typename N, std::size_t Dim,
-		bool Const,
-		bool Reverse>
-class Octree<L, N, Dim>::NodeIteratorBase<Const, Reverse> final {
+template<typename L, typename N, std::size_t Dim>
+template<bool Const, bool Reverse>
+class Octree<L, N, Dim>::NodeIteratorBase final {
 	
 private:
 	
 	friend Octree<L, N, Dim>;
-	template<bool Const>
-	friend Octree<L, N, Dim>::NodeRange<Const>;
+	template<bool Const_>
+	friend class Octree<L, N, Dim>::NodeRangeBase;
 	
 	// These typedefs reference the underlying lists in the Octree class that
 	// actually store the nodes.
-	using Range = Octree<L, N, Dim>::NodeRange<Const>;
+	using Range = Octree<L, N, Dim>::NodeRangeBase<Const>;
 	using List = Octree<L, N, Dim>::NodeList;
 	using ListIterator = std::conditional_t<
 			Const,
-			List::const_iterator,
-			List::iterator>;
+			typename List::const_iterator,
+			typename List::iterator>;
 	using ListReference = std::conditional_t<
 			Const,
-			List::const_reference,
-			List::reference>;
+			typename List::const_reference,
+			typename List::reference>;
 	
 	using OctreePointer = std::conditional_t<
 			Const,
@@ -813,9 +819,11 @@ private:
 			Octree<L, N, Dim>*>;
 	
 	OctreePointer const _octree;
-	Range::difference_type _index;
+	typename Range::difference_type _index;
 	
-	NodeIteratorBase(OctreePointer octree, Range::difference_type index) :
+	NodeIteratorBase(
+			OctreePointer octree,
+			typename Range::difference_type index) :
 			_octree(octree),
 			_index(index) {
 	}
@@ -831,17 +839,17 @@ private:
 public:
 	
 	// Iterator typedefs.
-	using value_type = Range::value_type;
+	using value_type = typename Range::value_type;
 	using reference = std::conditional_t<
 			Const,
-			Range::const_reference,
-			Range::reference>;
+			typename Range::const_reference,
+			typename Range::reference>;
 	using pointer = std::conditional_t<
 			Const,
-			Range::const_pointer,
-			Range::pointer>;
-	using size_type = Range::size_type;
-	using difference_type = Range::difference_type;
+			typename Range::const_pointer,
+			typename Range::pointer>;
+	using size_type = typename Range::size_type;
+	using difference_type = typename Range::difference_type;
 	using iterator_category = std::random_access_iterator_tag;
 	
 	operator NodeIteratorBase<true, Reverse>() const {
@@ -904,7 +912,7 @@ public:
 	 * additional leaves without being over capacity.
 	 */
 	bool canHoldLeafs(
-			Octree<L, N, Dim>::LeafRange::difference_type n = 0) const {
+			typename Octree<L, N, Dim>::LeafRange::difference_type n) const {
 		return
 			listRef().dataCount + n < _octree->_nodeCapacity ||
 			listRef().depth >= _octree->_maxDepth;
@@ -1055,9 +1063,8 @@ public:
 	friend NodeIteratorBase<Const, Reverse> operator+(
 			NodeIteratorBase<Const, Reverse> it,
 			difference_type n) {
-		NodeIteratorBase<Const, Reverse> result = *this;
-		result += n;
-		return result;
+		it += n;
+		return it;
 	}
 	friend NodeIteratorBase<Const, Reverse> operator+(
 			difference_type n,
@@ -1067,9 +1074,8 @@ public:
 	friend NodeIteratorBase<Const, Reverse> operator-(
 			NodeIteratorBase<Const, Reverse> it,
 			difference_type n) {
-		NodeIteratorBase<Const, Reverse> result = *this;
-		result -= n;
-		return result;
+		it -= n;
+		return it;
 	}
 	
 	friend difference_type operator-(
@@ -1127,10 +1133,9 @@ public:
  * 
  * \tparam Const whether this container allows for modifying its elements
  */
-template<
-		typename L, typename N, std::size_t Dim,
-		bool Const>
-class Octree<L, N, Dim>::NodeRangeBase<Const> final {
+template<typename L, typename N, std::size_t Dim>
+template<bool Const>
+class Octree<L, N, Dim>::NodeRangeBase final {
 	
 private:
 	
@@ -1161,7 +1166,7 @@ public:
 	using reference = N&;
 	using const_reference = N const&;
 	using pointer = N*;
-	using pointer = N const*;
+	using const_pointer = N const*;
 	using iterator =
 			Octree<L, N, Dim>::NodeIterator;
 	using const_iterator =
@@ -1257,8 +1262,6 @@ public:
 	}
 	
 };
-
-
 
 }
 
