@@ -39,6 +39,22 @@ class Octree final {
 	
 private:
 	
+	static_assert(
+			std::is_default_constructible<N>::value,
+			"type N must be default constructible");
+	static_assert(
+			std::is_copy_assignable<N>::value,
+			"type N must be copy assignable");
+	static_assert(
+			std::is_copy_constructible<N>::value,
+			"type N must be copy constructible");
+	static_assert(
+			std::is_copy_assignable<L>::value,
+			"type L must be copy assignable");
+	static_assert(
+			std::is_copy_constructible<L>::value,
+			"type L must be copy constructible");
+	
 	// These private classes are used to construct const-variants and
 	// reverse-variants of the public range and iterator classes.
 	

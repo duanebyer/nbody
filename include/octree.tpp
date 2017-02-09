@@ -29,7 +29,7 @@ Octree<L, N, Dim>::Octree(
 	Node root;
 	root.position = position;
 	root.dimensions = dimensions;
-	leafs.insert(leafs.begin(), root);
+	_nodes.insert(_nodes.begin(), root);
 }
 
 template<typename L, typename N, std::size_t Dim>
