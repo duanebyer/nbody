@@ -109,6 +109,7 @@ public:
 	Tensor(It begin, It end) {
 		for (std::size_t index = 0; index < Dim; ++index) {
 			PrevTensor tensor(begin, end);
+			_values[index] = tensor;
 			if ((std::size_t) (end - begin) >= PrevTensor::size) {
 				begin += PrevTensor::size;
 			}
