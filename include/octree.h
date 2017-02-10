@@ -37,7 +37,7 @@ namespace nbody {
 template<typename L, typename N, std::size_t Dim>
 class Octree final {
 	
-private:
+public:
 	
 	static_assert(
 			std::is_default_constructible<N>::value,
@@ -69,8 +69,6 @@ private:
 	
 	template<bool Const>
 	class NodeRangeBase;
-	
-public:
 	
 	///@{
 	/**
@@ -193,40 +191,40 @@ private:
 	NodeList _nodes;
 	
 	// The number of leaves to store at a single node of the octree.
-	std::size_t const _nodeCapacity;
+	std::size_t _nodeCapacity;
 	
 	// The maximum depth of the octree.
-	std::size_t const _maxDepth;
+	std::size_t _maxDepth;
 	
 	// Whether the tree should be automatically readjust itself so that each
 	// node has less leaves than the node capacity, as well as having as few
 	// children as possible. If this is false, then the adjust() method has to
 	// be called to force an adjustment.
-	bool const _adjust;
+	bool _adjust;
 	
 	
 	
 	// Divides a node into a set of subnodes and partitions its leaves between
 	// them. This function may reorganize the leaf vector (some leaf iterators
 	// may become invalid).
-	NodeIterator createChildren(ConstNodeIterator node);
+	NodeIterator createChildren(NodeIterator node);
 	
 	// Destroys all descendants of a node and takes their leaves into the node.
 	// This function will not reorganize the leaf vector (all leaf iterators
 	// will remain valid).
-	NodeIterator destroyChildren(ConstNodeIterator node);
+	NodeIterator destroyChildren(NodeIterator node);
 	
 	// Adds a leaf to a specific node.
-	LeafIterator insertAt(ConstNodeIterator node, Leaf const& leaf);
+	LeafIterator insertAt(NodeIterator node, Leaf const& leaf);
 	
 	// Removes a leaf from a node.
-	LeafIterator eraseAt(ConstNodeIterator node, ConstLeafIterator leaf);
+	LeafIterator eraseAt(NodeIterator node, LeafIterator leaf);
 	
 	// Moves a leaf from this node to another one.
 	LeafIterator moveAt(
-			ConstNodeIterator sourceNode,
-			ConstNodeIterator destNode,
-			ConstLeafIterator sourceLeaf);
+			NodeIterator sourceNode,
+			NodeIterator destNode,
+			LeafIterator sourceLeaf);
 	
 public:
 	
@@ -489,7 +487,7 @@ private:
 			Octree<L, N, Dim> const*,
 			Octree<L, N, Dim>*>;
 	
-	OctreePointer const _octree;
+	OctreePointer _octree;
 	typename Range::difference_type _index;
 	
 	LeafIteratorBase(
@@ -681,7 +679,7 @@ private:
 			Octree<L, N, Dim> const*,
 			Octree<L, N, Dim>*>;
 	
-	OctreePointer const _octree;
+	OctreePointer _octree;
 	std::size_t _lowerIndex;
 	std::size_t _upperIndex;
 	
@@ -834,7 +832,7 @@ private:
 			Octree<L, N, Dim> const*,
 			Octree<L, N, Dim>*>;
 	
-	OctreePointer const _octree;
+	OctreePointer _octree;
 	typename Range::difference_type _index;
 	
 	NodeIteratorBase(
@@ -919,9 +917,11 @@ public:
 	 * pointed to by this iterator.
 	 */
 	bool contains(Octree<L, N, Dim>::ConstLeafIterator leaf) const {
+		difference_type index = listRef().leafIndex;
+		difference_type count = listRef().leafCount;
 		return
-			leaf._index >= listRef().leafIndex &&
-			leaf._index < listRef().leafIndex + listRef().leafCount;
+			leaf._index >= index &&
+			leaf._index < index + count;
 	}
 	/**
 	 * \brief Returns whether the node is able to hold a certain number of
@@ -930,7 +930,7 @@ public:
 	bool canHoldLeafs(
 			typename Octree<L, N, Dim>::LeafRange::difference_type n) const {
 		return
-			listRef().dataCount + n < _octree->_nodeCapacity ||
+			listRef().leafCount + n < _octree->_nodeCapacity ||
 			listRef().depth >= _octree->_maxDepth;
 	}
 	
@@ -1162,7 +1162,7 @@ private:
 			Octree<L, N, Dim> const*,
 			Octree<L, N, Dim>*>;
 	
-	OctreePointer const _octree;
+	OctreePointer _octree;
 	std::size_t _lowerIndex;
 	std::size_t _upperIndex;
 	

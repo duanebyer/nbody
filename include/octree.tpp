@@ -34,7 +34,7 @@ Octree<L, N, Dim>::Octree(
 
 template<typename L, typename N, std::size_t Dim>
 typename Octree<L, N, Dim>::NodeIterator Octree<L, N, Dim>::createChildren(
-		ConstNodeIterator node) {
+		NodeIterator node) {
 	// Create the 2^Dim child nodes inside the list of nodes. This will not
 	// invalidate the node iterator.
 	_nodes.insert(node.listIt() + 1, 1 << Dim, Node());
@@ -65,13 +65,13 @@ typename Octree<L, N, Dim>::NodeIterator Octree<L, N, Dim>::createChildren(
 	
 	// Go through the parent, grandparent, great-grandparent, ...  of this
 	// node and update their child indices.
-	ConstNodeIterator parent = node;
+	NodeIterator parent = node;
 	while (parent.hasParent()) {
 		std::size_t siblingIndex = parent.listRef().siblingIndex;
 		parent = parent.parent();
 		while (++siblingIndex <= (1 << Dim)) {
 			parent.listRef().childIndices[siblingIndex] += (1 << Dim);
-			ConstNodeIterator child = parent.child(siblingIndex);
+			NodeIterator child = parent.child(siblingIndex);
 			child.listRef().parentIndex -= (1 << Dim);
 		}
 	}
@@ -80,7 +80,7 @@ typename Octree<L, N, Dim>::NodeIterator Octree<L, N, Dim>::createChildren(
 	for (std::size_t index = 0; index < node.leafs().size(); ++index) {
 		// Figure out which node the leaf belongs to.
 		std::size_t childIndex = 0;
-		ConstLeafIterator leaf = node.leafs()[index];
+		LeafIterator leaf = node.leafs().begin() + index;
 		Vector<Dim> const& position = leaf.position();
 		for (std::size_t dim = 0; dim < Dim; ++dim) {
 			if (position[dim] >= midpoint[dim]) {
@@ -95,7 +95,7 @@ typename Octree<L, N, Dim>::NodeIterator Octree<L, N, Dim>::createChildren(
 
 template<typename L, typename N, std::size_t Dim>
 typename Octree<L, N, Dim>::NodeIterator Octree<L, N, Dim>::destroyChildren(
-		ConstNodeIterator node) {
+		NodeIterator node) {
 	// Determine how many children, grandchildren, great-grandchildren, ...
 	// of this node.
 	std::size_t numDescendants = node.children().size();
@@ -108,13 +108,13 @@ typename Octree<L, N, Dim>::NodeIterator Octree<L, N, Dim>::destroyChildren(
 	
 	// Go through the parent, grandparent, great-grandparent, ... of this
 	// node and update their child indices.
-	ConstNodeIterator parent = node;
+	NodeIterator parent = node;
 	while (parent.hasParent()) {
 		std::size_t siblingIndex = parent.listRef().siblingIndex;
 		parent = parent.parent();
 		while (++siblingIndex <= (1 << Dim)) {
 			parent.listRef().childIndices[siblingIndex] -= numDescendants;
-			ConstNodeIterator child = parent.child(siblingIndex);
+			NodeIterator child = parent.child(siblingIndex);
 			child.listRef().parentIndex += numDescendants;
 		}
 	}
@@ -124,10 +124,10 @@ typename Octree<L, N, Dim>::NodeIterator Octree<L, N, Dim>::destroyChildren(
 
 template<typename L, typename N, std::size_t Dim>
 typename Octree<L, N, Dim>::LeafIterator Octree<L, N, Dim>::insertAt(
-		ConstNodeIterator node,
+		NodeIterator node,
 		Leaf const& leaf) {
 	// Add the leaf to the master list of leaves in the octree.
-	_leafs.insert(node.leafs().end().listIt());
+	_leafs.insert(node.leafs().end().listIt(), leaf);
 	
 	// Loop through the rest of the nodes and increment their leaf indices
 	// so that they still refer to the correct location in the leaf vector.
@@ -137,7 +137,7 @@ typename Octree<L, N, Dim>::LeafIterator Octree<L, N, Dim>::insertAt(
 	}
 	
 	// Also loop through all ancestors and increment their leaf counts.
-	ConstNodeIterator parent = node;
+	NodeIterator parent = node;
 	while (parent.hasParent()) {
 		++parent.listRef().leafCount;
 		parent = parent.parent();
@@ -148,8 +148,8 @@ typename Octree<L, N, Dim>::LeafIterator Octree<L, N, Dim>::insertAt(
 
 template<typename L, typename N, std::size_t Dim>
 typename Octree<L, N, Dim>::LeafIterator Octree<L, N, Dim>::eraseAt(
-		ConstNodeIterator node,
-		ConstLeafIterator leaf) {
+		NodeIterator node,
+		LeafIterator leaf) {
 	// Remove the leaf from the master octree leaf vector.
 	_leafs.erase(leaf.listIt());
 	
@@ -162,7 +162,7 @@ typename Octree<L, N, Dim>::LeafIterator Octree<L, N, Dim>::eraseAt(
 	
 	// Loop through all of the ancestors of this node and decremement their
 	// leaf counts.
-	ConstNodeIterator parent = node;
+	NodeIterator parent = node;
 	while (parent.hasParent()) {
 		--parent.listRef().leafCount;
 		parent = parent.parent();
@@ -173,14 +173,14 @@ typename Octree<L, N, Dim>::LeafIterator Octree<L, N, Dim>::eraseAt(
 
 template<typename L, typename N, std::size_t Dim>
 typename Octree<L, N, Dim>::LeafIterator Octree<L, N, Dim>::moveAt(
-		ConstNodeIterator sourceNode,
-		ConstNodeIterator destNode,
-		ConstLeafIterator sourceLeaf) {
+		NodeIterator sourceNode,
+		NodeIterator destNode,
+		LeafIterator sourceLeaf) {
 	// Reinsert the leaf into the leaf vector in its new position.
-	ConstLeafIterator destLeaf = destNode.leafs().end();
+	LeafIterator destLeaf = destNode.leafs().end();
 	bool inverted = sourceLeaf > destLeaf;
-	ConstLeafIterator firstLeaf = inverted ? destLeaf : sourceLeaf;
-	ConstLeafIterator lastLeaf = inverted ? sourceLeaf : destLeaf;
+	LeafIterator firstLeaf = inverted ? destLeaf : sourceLeaf;
+	LeafIterator lastLeaf = inverted ? sourceLeaf : destLeaf;
 	
 	std::rotate(
 		firstLeaf.listIt(),
@@ -188,14 +188,14 @@ typename Octree<L, N, Dim>::LeafIterator Octree<L, N, Dim>::moveAt(
 		lastLeaf.listIt() + inverted);
 	
 	// Adjust the ancestors of the source node.
-	ConstNodeIterator sourceParentNode = sourceNode;
+	NodeIterator sourceParentNode = sourceNode;
 	while (!sourceParentNode.contains(destLeaf)) {
 		--sourceParentNode.listRef().leafCount;
 		sourceParentNode = sourceParentNode.parent();
 	}
 	
 	// Adjust the ancestors of the destination node.
-	ConstNodeIterator destParentNode = destNode;
+	NodeIterator destParentNode = destNode;
 	while (!destParentNode.contains(sourceLeaf)) {
 		++destParentNode.listRef().leafCount;
 		destParentNode = destParentNode.parent();
@@ -280,15 +280,15 @@ Octree<L, N, Dim>::insert(
 	// Find the node with the correct position, and insert the leaf into
 	// that node.
 	Leaf leaf(data, position);
-	auto node = find(hint, leaf.position());
+	NodeIterator node = find(hint, position);
 	if (node == nodes().end()) {
-		return leafs().end();
+		return std::make_tuple(nodes().end(), leafs().end());
 	}
 	// Create children if the node doesn't have the capacity to store
 	// this leaf.
-	if (_adjust && !canHoldLeafs(node, +1)) {
+	if (_adjust && !node.canHoldLeafs(+1)) {
 		node = createChildren(node);
-		node = find(node, leaf.position());
+		node = find(node, position);
 	}
 	return std::make_tuple(node, insertAt(node, leaf));
 }
@@ -300,7 +300,7 @@ std::tuple<
 Octree<L, N, Dim>::insert(
 		L const& data,
 		Vector<Dim> const& position) {
-	return insert(nodes().front(), data, position);
+	return insert(nodes().begin(), data, position);
 }
 
 template<typename L, typename N, std::size_t Dim>
@@ -312,17 +312,17 @@ Octree<L, N, Dim>::erase(
 		LeafIterator leaf) {
 	// Find the node that contains this leaf, and then erase the leaf from
 	// that node.
-	auto node = find(hint, leaf);
-	if (node == _nodes.end()) {
-		return _leafs.end();
+	NodeIterator node = find(hint, leaf);
+	if (node == nodes.end()) {
+		return std::make_tuple(nodes.end(), leafs.end());
 	}
 	// If the parent of this node doesn't need to be divided into subnodes
 	// anymore, then merge its children together.
 	while (
 			_adjust &&
-			node->hasParent &&
-			canHoldLeafs(node + node->parentIndex, -1)) {
-		node = destroyChildren(node + node->parentIndex);
+			node.hasParent() &&
+			node.parent().canHoldLeafs(-1)) {
+		node = destroyChildren(node.parent());
 	}
 	return std::make_tuple(node, eraseAt(node, leaf));
 }
@@ -333,7 +333,7 @@ std::tuple<
 		typename Octree<L, N, Dim>::LeafIterator>
 Octree<L, N, Dim>::erase(
 		LeafIterator leaf) {
-	return erase(nodes().root(), leaf);
+	return erase(nodes().begin(), leaf);
 }
 
 template<typename L, typename N, std::size_t Dim>
@@ -347,32 +347,28 @@ Octree<L, N, Dim>::move(
 		Vector<Dim> const& position) {
 	// Find the source node that contains the leaf, and the target node with
 	// the correct position.
-	auto source = find(hint, leaf);
-	auto dest = find(hint, position);
+	NodeIterator source = find(hint, leaf);
+	NodeIterator dest = find(hint, position);
 	if (source == _nodes.end() || dest == _nodes.end()) {
-		return _leafs.end();
+		return std::make_tuple(nodes().end(), nodes().end(), leafs().end());
 	}
 	// If the source and the destination are distinct, then check to make
 	// sure that they remain within the node capcity.
 	if (_adjust && source != dest) {
 		while (
-				source->hasParent &&
-				canHoldLeafs(source + source->parentIndex, -1)) {
-			std::size_t destIndex = dest - _nodes.begin();
+				source.hasParent() &&
+				source.parent().canHoldLeafs(-1)) {
 			if (dest > source) {
-				destIndex -= (1 << Dim);
+				dest -= (1 << Dim);
 			}
-			source = destroyChildren(source + source->parentIndex);
-			dest = _nodes.begin() + destIndex;
+			source = destroyChildren(source.parent());
 		}
-		if (!canHoldLeafs(dest, +1)) {
-			std::size_t sourceIndex = source - _nodes.begin();
+		if (!dest.canHoldLeafs(+1)) {
 			if (source > dest) {
-				sourceIndex += (1 << Dim);
+				source += (1 << Dim);
 			}
 			dest = createChildren(dest);
 			dest = find(dest, position);
-			source = _nodes.begin() + sourceIndex;
 		}
 	}
 	return std::make_tuple(source, dest, moveAt(source, dest, leaf));
@@ -386,7 +382,7 @@ std::tuple<
 Octree<L, N, Dim>::move(
 		LeafIterator leaf,
 		Vector<Dim> const& position) {
-	return move(nodes().root(), leaf, position);
+	return move(nodes().begin(), leaf, position);
 }
 
 template<typename L, typename N, std::size_t Dim>
@@ -396,7 +392,7 @@ typename Octree<L, N, Dim>::NodeIterator Octree<L, N, Dim>::find(
 	bool contains = hint.contains(position);
 	// If this node is childless and contains the point, then just return it.
 	if (contains && !hint.hasChildren()) {
-		return hint;
+		return NodeIterator(this, hint._index);
 	}
 	// If it is childless but contains the point, then recursively call this
 	// method on the child that also conains the point.
@@ -418,7 +414,7 @@ typename Octree<L, N, Dim>::NodeIterator Octree<L, N, Dim>::find(
 	bool contains = hint.contains(leaf);
 	// If this node is childless and contains the leaf, then return itself.
 	if (contains && !hint.hasChildren()) {
-		return hint;
+		return NodeIterator(this, hint._index);
 	}
 	// If it has children and contains the leaf, then recursively call this
 	// method on the child that contains the leaf.
