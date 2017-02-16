@@ -33,8 +33,11 @@ BOOST_AUTO_TEST_CASE(OctreeInsertionTest) {
 	
 	// Put a single leaf in each octant of the octree.
 	for (std::size_t index = 0; index < 8; ++index) {
-		Vector<3> position =
-			{(Scalar) (index & 1), (Scalar) (index & 2), (Scalar) (index & 4)};
+		Vector<3> position = {
+			(Scalar) (index >> 0 & 1),
+			(Scalar) (index >> 1 & 1),
+			(Scalar) (index >> 2 & 1)
+		};
 		position *= 0.9;
 		position += {0.05, 0.05, 0.05};
 		octree.insert(Leaf(index), position);
