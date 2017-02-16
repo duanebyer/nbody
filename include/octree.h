@@ -930,7 +930,7 @@ public:
 	bool canHoldLeafs(
 			typename Octree<L, N, Dim>::LeafRange::difference_type n) const {
 		return
-			listRef().leafCount + n < _octree->_nodeCapacity ||
+			listRef().leafCount + n <= _octree->_nodeCapacity ||
 			listRef().depth >= _octree->_maxDepth;
 	}
 	

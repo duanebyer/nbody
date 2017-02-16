@@ -61,6 +61,7 @@ typename Octree<L, N, Dim>::NodeIterator Octree<L, N, Dim>::createChildren(
 		// Add the child to this node.
 		node.listRef().childIndices[index] = index + 1;
 	}
+	node.listRef().childIndices[1 << Dim] = (1 << Dim) + 1;
 	node.listRef().hasChildren = true;
 	
 	// Go through the parent, grandparent, great-grandparent, ...  of this
@@ -77,7 +78,7 @@ typename Octree<L, N, Dim>::NodeIterator Octree<L, N, Dim>::createChildren(
 	}
 	
 	// Distribute the leaves of this node to the children.
-	for (std::size_t index = 0; index < node.leafs().size(); ++index) {
+	for (std::size_t index = node.leafs().size(); index-- > 0; ) {
 		// Figure out which node the leaf belongs to.
 		std::size_t childIndex = 0;
 		LeafIterator leaf = node.leafs().begin() + index;
@@ -138,10 +139,10 @@ typename Octree<L, N, Dim>::LeafIterator Octree<L, N, Dim>::insertAt(
 	
 	// Also loop through all ancestors and increment their leaf counts.
 	NodeIterator parent = node;
-	while (parent.hasParent()) {
+	do {
 		++parent.listRef().leafCount;
 		parent = parent.parent();
-	}
+	} while (parent.hasParent());
 	
 	return node.leafs().end() - 1;
 }
@@ -163,10 +164,10 @@ typename Octree<L, N, Dim>::LeafIterator Octree<L, N, Dim>::eraseAt(
 	// Loop through all of the ancestors of this node and decremement their
 	// leaf counts.
 	NodeIterator parent = node;
-	while (parent.hasParent()) {
+	do {
 		--parent.listRef().leafCount;
 		parent = parent.parent();
-	}
+	} while (parent.hasParent());
 	
 	return leaf;
 }
@@ -177,15 +178,15 @@ typename Octree<L, N, Dim>::LeafIterator Octree<L, N, Dim>::moveAt(
 		NodeIterator destNode,
 		LeafIterator sourceLeaf) {
 	// Reinsert the leaf into the leaf vector in its new position.
-	LeafIterator destLeaf = destNode.leafs().end();
+	LeafIterator destLeaf = destNode.leafs().end() - 1;
 	bool inverted = sourceLeaf > destLeaf;
 	LeafIterator firstLeaf = inverted ? destLeaf : sourceLeaf;
 	LeafIterator lastLeaf = inverted ? sourceLeaf : destLeaf;
 	
 	std::rotate(
-		firstLeaf.listIt(),
+		firstLeaf.listIt() + inverted,
 		sourceLeaf.listIt() + !inverted,
-		lastLeaf.listIt() + inverted);
+		lastLeaf.listIt() + 1);
 	
 	// Adjust the ancestors of the source node.
 	NodeIterator sourceParentNode = sourceNode;
@@ -207,8 +208,8 @@ typename Octree<L, N, Dim>::LeafIterator Octree<L, N, Dim>::moveAt(
 	
 	// Adjust the nodes in between the source and destination node.
 	std::ptrdiff_t invertedSign = inverted ? -1 : +1;
-	for (auto node = sourceNode.listIt(); node < destNode.listIt(); ++node) {
-		node->leafIndex -= invertedSign;
+	for (NodeIterator node = sourceNode + 1; node <= destNode; ++node) {
+		node.listRef().leafIndex -= invertedSign;
 	}
 	
 	return destLeaf;
