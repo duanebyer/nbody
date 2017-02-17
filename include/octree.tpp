@@ -139,10 +139,12 @@ typename Octree<L, N, Dim>::LeafIterator Octree<L, N, Dim>::insertAt(
 	
 	// Also loop through all ancestors and increment their leaf counts.
 	NodeIterator parent = node;
-	do {
+	bool hasParent = true;
+	while (hasParent) {
 		++parent.listRef().leafCount;
+		hasParent = parent.hasParent();
 		parent = parent.parent();
-	} while (parent.hasParent());
+	}
 	
 	return node.leafs().end() - 1;
 }
@@ -164,10 +166,12 @@ typename Octree<L, N, Dim>::LeafIterator Octree<L, N, Dim>::eraseAt(
 	// Loop through all of the ancestors of this node and decremement their
 	// leaf counts.
 	NodeIterator parent = node;
-	do {
+	bool hasParent = true;
+	while (hasParent) {
 		--parent.listRef().leafCount;
+		hasParent = parent.hasParent();
 		parent = parent.parent();
-	} while (parent.hasParent());
+	}
 	
 	return leaf;
 }
@@ -287,7 +291,7 @@ Octree<L, N, Dim>::insert(
 	}
 	// Create children if the node doesn't have the capacity to store
 	// this leaf.
-	if (_adjust && !node.canHoldLeafs(+1)) {
+	while (_adjust && !node.canHoldLeafs(+1)) {
 		node = createChildren(node);
 		node = find(node, position);
 	}
