@@ -78,10 +78,10 @@ typename Octree<L, N, Dim>::NodeIterator Octree<L, N, Dim>::createChildren(
 	}
 	
 	// Distribute the leaves of this node to the children.
-	for (std::size_t index = node.leafs().size(); index-- > 0; ) {
+	for (std::size_t index = 0; index < node.leafs().size(); ++index) {
 		// Figure out which node the leaf belongs to.
 		std::size_t childIndex = 0;
-		LeafIterator leaf = node.leafs().begin() + index;
+		LeafIterator leaf = node.leafs().begin();
 		Vector<Dim> const& position = leaf.position();
 		for (std::size_t dim = 0; dim < Dim; ++dim) {
 			if (position[dim] >= midpoint[dim]) {
