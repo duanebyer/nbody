@@ -16,13 +16,13 @@ using TestOctree = Octree<Leaf, Node, 3>;
 using TestQuadtree = Octree<Leaf, Node, 2>;
 
 struct Leaf {
-	int data;
+	std::size_t data;
 	explicit Leaf(int data) : data(data) {
 	}
 };
 
 struct Node {
-	int data;
+	std::size_t data;
 	explicit Node(int data = 0) : data(data) {
 	}
 };
@@ -70,7 +70,7 @@ BOOST_AUTO_TEST_CASE(OctreeShallowInsertionTest) {
 			leafs.size() == 1,
 			"child " << index << " should have 1 leaf");
 		BOOST_REQUIRE_MESSAGE(
-			(std::size_t) leaf->data == index,
+			leaf->data == index,
 			"leaf has data " << leaf->data << ", should be " << index);
 	}
 }
@@ -160,9 +160,9 @@ BOOST_AUTO_TEST_CASE(OctreeDeepInsertionTest) {
 	// Iterate over both the leafs and the nodes and compare them to the arrays
 	// from above.
 	for (std::size_t index = 0; index < numLeafs; ++index) {
-		int leafData = quadtree.leafs()[index].data;
+		std::size_t leafData = quadtree.leafs()[index].data;
 		BOOST_REQUIRE_MESSAGE(
-			(std::size_t) leafData == order[index],
+			leafData == order[index],
 			"leaf at index " + std::to_string(index) +
 			" should have data " + std::to_string(order[index]) +
 			" instead of data " + std::to_string(leafData));
@@ -183,6 +183,35 @@ BOOST_AUTO_TEST_CASE(OctreeDeepInsertionTest) {
 			" leafs");
 		++nodeIndex;
 		++nodeIt;
+	}
+}
+
+BOOST_AUTO_TEST_CASE(OctreeSamePointInsertionTest) {
+	// Create a quadtree with a maximum depth of 3. This corresponds to 4
+	// generations of nodes (since the root node is at a depth of 0).
+	TestQuadtree quadtree(
+		{0.0, 0.0},
+		{1.0, 1.0},
+		3, 3);
+	
+	for (std::size_t index = 0; index < 4; ++index) {
+		quadtree.insert(Leaf(index), {1.0 / 16.0, 1.0 / 16.0});
+	}
+	
+	TestQuadtree::NodeIterator bottomNodeIt = quadtree.nodes().begin() + 3;
+	BOOST_REQUIRE_MESSAGE(
+		!bottomNodeIt.hasChildren(),
+		"deepest node shouldn't have children");
+	BOOST_REQUIRE_MESSAGE(
+		bottomNodeIt.leafs().size() == 4,
+		"deepest node should have 4 children");
+	
+	for (std::size_t index = 0; index < quadtree.leafs().size(); ++index) {
+		std::size_t data = bottomNodeIt.leafs()[index].data;
+		BOOST_REQUIRE_MESSAGE(
+			data == index,
+			"node at index " + std::to_string(index) +
+			" has data " + std::to_string(data));
 	}
 }
 
