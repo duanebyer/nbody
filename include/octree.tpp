@@ -102,7 +102,7 @@ typename Octree<L, N, Dim>::NodeIterator Octree<L, N, Dim>::destroyChildren(
 	std::size_t numDescendants = node.children().size();
 	
 	// Destroy the subnodes. This won't invalidate the node iterator.
-	_nodes->erase(
+	_nodes.erase(
 		node.children().begin().listIt(),
 		node.children().end().listIt());
 	node.listRef().hasChildren = false;
@@ -318,8 +318,8 @@ Octree<L, N, Dim>::erase(
 	// Find the node that contains this leaf, and then erase the leaf from
 	// that node.
 	NodeIterator node = find(hint, leaf);
-	if (node == nodes.end()) {
-		return std::make_tuple(nodes.end(), leafs.end());
+	if (node == nodes().end()) {
+		return std::make_tuple(nodes().end(), leafs().end());
 	}
 	// If the parent of this node doesn't need to be divided into subnodes
 	// anymore, then merge its children together.
@@ -354,7 +354,7 @@ Octree<L, N, Dim>::move(
 	// the correct position.
 	NodeIterator source = find(hint, leaf);
 	NodeIterator dest = find(hint, position);
-	if (source == _nodes.end() || dest == _nodes.end()) {
+	if (source == nodes().end() || dest == nodes().end()) {
 		return std::make_tuple(nodes().end(), nodes().end(), leafs().end());
 	}
 	// If the source and the destination are distinct, then check to make

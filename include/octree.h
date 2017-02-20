@@ -1007,7 +1007,7 @@ public:
 	NodeIteratorBase<Const, Reverse> child(
 			ConstLeafIterator leaf) const {
 		for (size_type childIndex = 0; childIndex < (1 << Dim); ++childIndex) {
-			NodeIteratorBase<Const, Reverse> child = child(childIndex);
+			NodeIteratorBase<Const, Reverse> child = this->child(childIndex);
 			if (child.contains(leaf)) {
 				return child;
 			}
