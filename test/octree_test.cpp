@@ -28,13 +28,14 @@ struct Node {
 };
 
 // Insert 8 leafs into an octree, one per octant.
-BOOST_AUTO_TEST_CASE(OctreeShallowInsertionTest) {
+BOOST_AUTO_TEST_CASE(OctreeShallowInsertTest) {
 	TestOctree octree(
 		{0.0, 0.0, 0.0},
 		{1.0, 1.0, 1.0},
 		3, 4);
 	
-	// Put a single leaf in each octant of the octree, in a specific order.
+	// Put a single leaf in each octant of the octree. Check that after the
+	// third insertion, the root node subdivides.
 	for (std::size_t index = 0; index < 8; ++index) {
 		Vector<3> position = {
 			(Scalar) (index >> 0 & 1),
@@ -44,6 +45,18 @@ BOOST_AUTO_TEST_CASE(OctreeShallowInsertionTest) {
 		position *= 0.9;
 		position += {0.05, 0.05, 0.05};
 		octree.insert(Leaf(index), position);
+		if (index < 3) {
+			BOOST_REQUIRE_MESSAGE(
+				octree.nodes().size() == 1,
+				"the root node should have no children for " +
+				std::to_string(index + 1) + " leafs");
+		}
+		else {
+			BOOST_REQUIRE_MESSAGE(
+				octree.nodes().size() == 9,
+				"the root node should have children for " +
+				std::to_string(index + 1) + " leafs");
+		}
 	}
 	
 	BOOST_REQUIRE_MESSAGE(
@@ -76,7 +89,7 @@ BOOST_AUTO_TEST_CASE(OctreeShallowInsertionTest) {
 }
 
 // Insert a number of leafs into a quadtree, testing deeper insertion.
-BOOST_AUTO_TEST_CASE(OctreeDeepInsertionTest) {
+BOOST_AUTO_TEST_CASE(OctreeDeepInsertTest) {
 	TestQuadtree quadtree(
 		{0.0, 0.0},
 		{16.0, 16.0},
@@ -186,7 +199,7 @@ BOOST_AUTO_TEST_CASE(OctreeDeepInsertionTest) {
 	}
 }
 
-BOOST_AUTO_TEST_CASE(OctreeSamePointInsertionTest) {
+BOOST_AUTO_TEST_CASE(OctreeSamePointInsertTest) {
 	// Create a quadtree with a maximum depth of 3. This corresponds to 4
 	// generations of nodes (since the root node is at a depth of 0).
 	TestQuadtree quadtree(
@@ -212,6 +225,48 @@ BOOST_AUTO_TEST_CASE(OctreeSamePointInsertionTest) {
 			data == index,
 			"node at index " + std::to_string(index) +
 			" has data " + std::to_string(data));
+	}
+}
+
+BOOST_AUTO_TEST_CASE(OctreeShallowEraseTest) {
+	TestOctree octree(
+		{0.0, 0.0, 0.0},
+		{1.0, 1.0, 1.0},
+		3, 4);
+	
+	// Insert a single point into each quadrant.
+	for (std::size_t index = 0; index < 8; ++index) {
+		Vector<3> position = {
+			(Scalar) (index >> 0 & 1),
+			(Scalar) (index >> 1 & 1),
+			(Scalar) (index >> 2 & 1)
+		};
+		position *= 0.9;
+		position += {0.05, 0.05, 0.05};
+		octree.insert(Leaf(index), position);
+	}
+	
+	// Remove the points one at a time. Check that the number of nodes decreases
+	// correctly as points are removed.
+	for (std::size_t index = 8; index-- > 0; ) {
+		TestOctree::LeafIterator leaf = octree.leafs().end() - 1;
+		BOOST_REQUIRE_MESSAGE(
+			leaf->data == index,
+			"leaf at index " + std::to_string(index) +
+			" has data " + std::to_string(leaf->data));
+		octree.erase(leaf);
+		if (index <= 3) {
+			BOOST_REQUIRE_MESSAGE(
+				octree.nodes().size() == 1,
+				"the root node should have no children for " +
+				std::to_string(index) + " leafs");
+		}
+		else {
+			BOOST_REQUIRE_MESSAGE(
+				octree.nodes().size() == 9,
+				"the root node should have children for " +
+				std::to_string(index) + " leafs");
+		}
 	}
 }
 
