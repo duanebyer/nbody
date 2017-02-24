@@ -247,6 +247,16 @@ public:
 			std::size_t maxDepth = sizeof(Scalar) * CHAR_BIT,
 			bool adjust = true);
 	
+	std::size_t nodeCapacity() const {
+		return _nodeCapacity;
+	}
+	std::size_t maxDepth() const {
+		return _maxDepth;
+	}
+	bool adjust() const {
+		return _adjust;
+	}
+	
 	///@{
 	/**
 	 * \brief Gets a pseudo-container that contains the leaves of the Octree.
@@ -1029,6 +1039,13 @@ public:
 	 * \brief Returns a list of all of the leaves contained within this node.
 	 */
 	LeafRangeBase<Const> leafs() const;
+	
+	/**
+	 * \brief Returns how many generations beneath the root that this node is.
+	 */
+	std::size_t depth() const {
+		return listRef().depth;
+	}
 	
 	// Iterator element access methods.
 	reference operator*() const {
