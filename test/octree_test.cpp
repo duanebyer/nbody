@@ -2,7 +2,11 @@
 
 #include <boost/test/unit_test.hpp>
 
+#include <algorithm>
+#include <iterator>
 #include <string>
+#include <utility>
+#include <vector>
 
 #include "octree.h"
 #include "tensor.h"
@@ -19,13 +23,168 @@ struct Leaf {
 	std::size_t data;
 	explicit Leaf(int data) : data(data) {
 	}
+	bool operator==(Leaf const& other) const {
+		return data == other.data;
+	}
+	bool operator!=(Leaf const& other) const {
+		return data != other.data;
+	}
 };
 
 struct Node {
 	std::size_t data;
 	explicit Node(int data = 0) : data(data) {
 	}
+	bool operator==(Node const& other) const {
+		return data == other.data;
+	}
+	bool operator!=(Node const& other) const {
+		return data != other.data;
+	}
 };
+
+enum class CheckOctreeResult {
+	Success,
+	RootHasParent,
+	LeafDuplicate,
+	LeafMissing,
+	DepthIncorrect,
+	LeafOutOfBounds,
+	NodeOverCapacity,
+	NodeOverDepth,
+	NodeUnderCapacity,
+	ChildLeafDuplicate,
+	ChildLeafMissing,
+	ChildParentMismatch,
+	LeafNotInChild,
+	LeafNotInParent,
+	ChildCountMismatch,
+};
+
+// Takes an octree and a list of leafs that should be contained within the
+// octree. Returns whether the structure of the octree is correct for the given
+// points.
+template<std::size_t Dim>
+CheckOctreeResult checkOctree(
+		Octree<Leaf, Node, Dim> const& octree,
+		std::vector<std::pair<Leaf, Vector<Dim> > > allLeafPairs) {
+	// Create a stack storing the points that belong to the current node.
+	std::vector<std::vector<std::pair<Leaf, Vector<Dim> > > > stack;
+	stack.push_back(allLeafPairs);
+	
+	// Check that the root node has no parent.
+	if (octree.nodes().begin().hasParent()) {
+		return CheckOctreeResult::RootHasParent;
+	}
+	
+	// Loop through all of the nodes.
+	for (
+			auto node = octree.nodes().begin();
+			node != octree.nodes().end();
+			++node) {
+		// Check that the current node has depth of +1 from its parent.
+		if (node.depth() !=
+				(node.hasParent() ? node.parent().depth() + 1 : 0)) {
+			return CheckOctreeResult::DepthIncorrect;
+		}
+		
+		// Take the top of the stack, and check whether each of the
+		// leaf-position pairs are within the dimensions.
+		std::vector<std::pair<Leaf, Vector<Dim> > > leafPairs(stack.back());
+		stack.pop_back();
+		
+		if (leafPairs.size() > node.leafs().size()) {
+			return CheckOctreeResult::LeafDuplicate;
+		}
+		if (leafPairs.size() < node.leafs().size()) {
+			return CheckOctreeResult::LeafMissing;
+		}
+		
+		for (auto leafPair : leafPairs) {
+			auto leaf = std::find(
+				node.leafs().begin(),
+				node.leafs().end(),
+				leafPair.first);
+			if (leaf == node.leafs().end()) {
+				return CheckOctreeResult::LeafMissing;
+			}
+			if (leaf.position() != leafPair.second) {
+				for (std::size_t dim = 0; dim < Dim; ++dim) {
+					Scalar lower = node.position()[dim];
+					Scalar upper = lower + node.dimensions()[dim];
+					if (!(
+							leaf.position()[dim] >= lower &&
+							leaf.position()[dim] < upper)) {
+						return CheckOctreeResult::LeafOutOfBounds;
+					}
+				}
+			}
+		}
+		
+		if (!node.hasChildren()) {
+			// If the node doesn't have children, then make sure that it doesn't
+			// have too many leafs and that it isn't too deep.
+			if (node.leafs().size() > octree.nodeCapacity()) {
+				return CheckOctreeResult::NodeOverCapacity;
+			}
+			if (node.depth() > octree.maxDepth()) {
+				return CheckOctreeResult::NodeOverDepth;
+			}
+		}
+		else {
+			// Otherwise, make sure it doens't have too few leafs either.
+			if (node.leafs().size() <= octree.nodeCapacity()) {
+				return CheckOctreeResult::NodeUnderCapacity;
+			}
+			for (
+					std::size_t childIndex = 0;
+					childIndex < (1 << Dim);
+					++childIndex) {
+				auto child = node.child(childIndex);
+				
+				// Check that the child's parent is this node.
+				if (child.parent() != node) {
+					return CheckOctreeResult::ChildParentMismatch;
+				}
+				// Create a vector to store the leaf-position pairs that belong
+				// to the child.
+				std::vector<std::pair<Leaf, Vector<Dim> > > childLeafPairs;
+				auto lastChildLeaf = std::partition(
+					leafPairs.begin(),
+					leafPairs.end(),
+					[child](std::pair<Leaf, Vector<Dim> > leafPair) {
+						auto begin = child.leafs().begin();
+						auto end = child.leafs().end();
+						return std::find(begin, end, leafPair.first) != end;
+					});
+				std::copy(
+					leafPairs.begin(),
+					lastChildLeaf,
+					std::back_inserter(childLeafPairs));
+				leafPairs.erase(leafPairs.begin(), lastChildLeaf);
+				
+				// Put the child leaf pairs onto the stack.
+				if (childLeafPairs.size() != child.leafs().size()) {
+					return CheckOctreeResult::LeafNotInParent;
+				}
+				stack.push_back(childLeafPairs);
+			}
+			// Check that each of the leaf-position pairs belonged to at least
+			// one of the children.
+			if (!leafPairs.empty()) {
+				return CheckOctreeResult::LeafNotInChild;
+			}
+		}
+	}
+	
+	// The stack should be empty, except if one of the nodes didn't have the
+	// right number of children.
+	if (!stack.empty()) {
+		return CheckOctreeResult::ChildCountMismatch;
+	}
+	
+	return CheckOctreeResult::Success;
+}
 
 // Insert 8 leafs into an octree, one per octant.
 BOOST_AUTO_TEST_CASE(OctreeShallowInsertTest) {
@@ -86,6 +245,59 @@ BOOST_AUTO_TEST_CASE(OctreeShallowInsertTest) {
 			leaf->data == index,
 			"leaf has data " << leaf->data << ", should be " << index);
 	}
+}
+
+BOOST_AUTO_TEST_CASE(OctreeCheckTest) {
+	TestQuadtree quadtree(
+		{0.0, 0.0},
+		{16.0, 16.0},
+		3, 4);
+	Vector<2> positions[] = {
+		{1,  2},
+		{6,  2},
+		{6,  6},
+		{3,  2},
+		{2,  6},
+		{14, 6},
+		{6,  14},
+		{6,  10},
+		{2,  10},
+		{2,  14},
+		
+		{10, 6},
+		{10, 2},
+		{9,  9},
+		{15, 1},
+		{13, 3},
+		{15, 3},
+		{13, 1},
+		{11, 9},
+		{9,  11},
+		{11, 11},
+		
+		{15, 9},
+		{15, 13},
+		{15, 11},
+		{15, 15},
+		{13, 9},
+		{13, 13},
+		{11, 13},
+		{9,  13},
+		{11, 15},
+		{9,  15},
+	};
+	std::size_t numLeafs = sizeof(positions) / sizeof(positions[0]);
+	std::vector<std::pair<Leaf, Vector<2> > > leafPairs;
+	for (std::size_t index = 0; index < numLeafs; ++index) {
+		Leaf leaf(index);
+		Vector<2> position(positions[index]);
+		leafPairs.push_back(std::make_pair(leaf, position));
+		quadtree.insert(leaf, position);
+	}
+	CheckOctreeResult result = checkOctree(quadtree, leafPairs);
+	BOOST_REQUIRE_MESSAGE(
+		result == CheckOctreeResult::Success,
+		"octree has invalid form (" + std::to_string((int) result) + ")");
 }
 
 // Insert a number of leafs into a quadtree, testing deeper insertion.
@@ -166,6 +378,7 @@ BOOST_AUTO_TEST_CASE(OctreeDeepInsertTest) {
 			14, 4, 1, 1, 1, 1, 3, 4, 1, 1, 1, 1, 3,
 	};
 	
+	// Actually insert all of the leafs.
 	for (std::size_t index = 0; index < numLeafs; ++index) {
 		quadtree.insert(Leaf(index), positions[index]);
 	}
@@ -267,6 +480,55 @@ BOOST_AUTO_TEST_CASE(OctreeShallowEraseTest) {
 				"the root node should have children for " +
 				std::to_string(index) + " leafs");
 		}
+	}
+}
+
+BOOST_AUTO_TEST_CASE(OctreeDeepEraseTest) {
+	TestQuadtree quadtree(
+		{0.0, 0.0},
+		{16.0, 16.0},
+		3, 4);
+	
+	// The positions where the leafs will be placed.
+	Vector<2> positions[] = {
+		{1,  2},
+		{6,  2},
+		{6,  6},
+		{3,  2},
+		{2,  6},
+		{14, 6},
+		{6,  14},
+		{6,  10},
+		{2,  10},
+		{2,  14},
+		
+		{10, 6},
+		{10, 2},
+		{9,  9},
+		{15, 1},
+		{13, 3},
+		{15, 3},
+		{13, 1},
+		{11, 9},
+		{9,  11},
+		{11, 11},
+		
+		{15, 9},
+		{15, 13},
+		{15, 11},
+		{15, 15},
+		{13, 9},
+		{13, 13},
+		{11, 13},
+		{9,  13},
+		{11, 15},
+		{9,  15},
+	};
+	std::size_t numLeafs = sizeof(positions) / sizeof(positions[0]);
+	
+	// Insert all of the leafs.
+	for (std::size_t index = 0; index < numLeafs; ++index) {
+		quadtree.insert(Leaf(index), positions[index]);
 	}
 }
 
