@@ -70,11 +70,12 @@ typename Octree<L, N, Dim>::NodeIterator Octree<L, N, Dim>::createChildren(
 	while (parent.hasParent()) {
 		std::size_t siblingIndex = parent.listRef().siblingIndex;
 		parent = parent.parent();
-		while (++siblingIndex <= (1 << Dim)) {
+		while (++siblingIndex < (1 << Dim)) {
 			parent.listRef().childIndices[siblingIndex] += (1 << Dim);
 			NodeIterator child = parent.child(siblingIndex);
 			child.listRef().parentIndex -= (1 << Dim);
 		}
+		parent.listRef().childIndices[1 << Dim] += (1 << Dim);
 	}
 	
 	// Distribute the leaves of this node to the children.
@@ -113,11 +114,12 @@ typename Octree<L, N, Dim>::NodeIterator Octree<L, N, Dim>::destroyChildren(
 	while (parent.hasParent()) {
 		std::size_t siblingIndex = parent.listRef().siblingIndex;
 		parent = parent.parent();
-		while (++siblingIndex <= (1 << Dim)) {
+		while (++siblingIndex < (1 << Dim)) {
 			parent.listRef().childIndices[siblingIndex] -= numDescendants;
 			NodeIterator child = parent.child(siblingIndex);
 			child.listRef().parentIndex += numDescendants;
 		}
+		parent.listRef().childIndices[1 << Dim] -= numDescendants;
 	}
 	
 	return node;
