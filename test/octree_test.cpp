@@ -92,7 +92,7 @@ void testEraseOctree(
 		std::vector<std::pair<Leaf, Vector<Dim> > >& leafPairs,
 		std::vector<std::pair<Leaf, Vector<Dim> > > eraseLeafPairs);
 
-// Insert 8 leafs into an octree, one per octant, then removes them in reverse
+// Insert 8 leafs into an octree, one per octant, then removes them in the same
 // order.
 BOOST_AUTO_TEST_CASE(OctreeShallowInsertEraseTest) {
 	TestOctree octree(
@@ -258,12 +258,15 @@ CheckOctreeResult checkOctree(
 		}
 		
 		if (!node.hasChildren()) {
+			int depthSign =
+				(node.depth() > octree.maxDepth()) -
+				(node.depth() < octree.maxDepth());
 			// If the node doesn't have children, then make sure that it doesn't
 			// have too many leafs and that it isn't too deep.
-			if (node.leafs().size() > octree.nodeCapacity()) {
+			if (depthSign < 0 && node.leafs().size() > octree.nodeCapacity()) {
 				return CheckOctreeResult::NodeOverCapacity;
 			}
-			if (node.depth() > octree.maxDepth()) {
+			if (depthSign > 0) {
 				return CheckOctreeResult::NodeOverDepth;
 			}
 		}
@@ -333,8 +336,8 @@ void testInsertOctree(
 	// Loop through every leaf pair that is to be inserted.
 	while (insertLeafPairs.size() > 0) {
 		// Get the next leaf to insert.
-		std::pair<Leaf, Vector<Dim> > insertLeafPair = insertLeafPairs.back();
-		insertLeafPairs.pop_back();
+		std::pair<Leaf, Vector<Dim> > insertLeafPair = insertLeafPairs.front();
+		insertLeafPairs.erase(insertLeafPairs.begin());
 		
 		// Insert it into both leafPairs and the octree itself.
 		leafPairs.push_back(insertLeafPair);
@@ -359,8 +362,8 @@ void testEraseOctree(
 	// Loop through every leaf pair that is to be erased.
 	while (eraseLeafPairs.size() > 0) {
 		// Get the next leaf to erase.
-		std::pair<Leaf, Vector<Dim> > eraseLeafPair = eraseLeafPairs.back();
-		eraseLeafPairs.pop_back();
+		std::pair<Leaf, Vector<Dim> > eraseLeafPair = eraseLeafPairs.front();
+		eraseLeafPairs.erase(eraseLeafPairs.begin());
 		
 		// Find the corresponding pair that is already in leafPairs.
 		auto octreeLeafPair = std::find(
