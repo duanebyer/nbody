@@ -7,6 +7,7 @@
 #include <algorithm>
 #include <array>
 #include <iterator>
+#include <sstream>
 #include <string>
 #include <utility>
 #include <vector>
@@ -50,6 +51,44 @@ struct Node {
 	}
 };
 
+enum class CheckOctreeResult {
+	Success,
+	RootHasParent,
+	LeafDuplicate,
+	LeafMissing,
+	DepthIncorrect,
+	LeafPositionMismatch,
+	LeafOutOfBounds,
+	NodeOverCapacity,
+	NodeOverDepth,
+	NodeUnderCapacity,
+	ChildParentMismatch,
+	LeafNotInChild,
+	LeafNotInParent,
+	ChildCountMismatch,
+};
+
+// Takes an octree and a list of leaf-position pairs that should be contained
+// within it. Checks the structure of the octree to make sure that the leafs
+// are located at appropriate locations within the octree.
+template<std::size_t Dim>
+static CheckOctreeResult checkOctree(
+		TestOctree<Dim> const& octree,
+		std::vector<LeafPair<Dim> > allLeafPairs);
+
+template<std::size_t Dim>
+std::string to_string(Vector<Dim> vector);
+
+std::string to_string(Leaf leaf);
+
+template<std::size_t Dim>
+std::string to_string(LeafPair<Dim> pair);
+
+template<std::size_t Dim>
+std::string to_string(TestOctree<Dim> octree);
+
+std::string to_string(CheckOctreeResult check);
+
 // This is needed so that Boost can print out test messages.
 namespace boost {
 namespace test_tools {
@@ -58,32 +97,35 @@ namespace tt_detail {
 template<>
 struct print_log_value<Leaf> {
 	void operator()(std::ostream& os, Leaf const& leaf) {
-		os << "Leaf(" << leaf.data << ")";
+		os << to_string(leaf);
 	}
 };
 
 template<std::size_t Dim>
 struct print_log_value<Vector<Dim> > {
 	void operator()(std::ostream& os, Vector<Dim> const& vector) {
-		os << "<";
-		if (Dim != 0) {
-			os << vector[0];
-		}
-		for (std::size_t dim = 1; dim < Dim; ++dim) {
-			os << ", " << vector[dim];
-		}
-		os << ">";
+		os << to_string(vector);
 	}
 };
 
 template<std::size_t Dim>
 struct print_log_value<LeafPair<Dim> > {
 	void operator()(std::ostream& os, LeafPair<Dim> const& pair) {
-		os << "(";
-		print_log_value<Leaf>()(os, std::get<Leaf>(pair));
-		os << ", ";
-		print_log_value<Vector<Dim> >()(os, std::get<Vector<Dim> >(pair));
-		os << ")";
+		os << to_string(pair);
+	}
+};
+
+template<std::size_t Dim>
+struct print_log_value<TestOctree<Dim> > {
+	void operator()(std::ostream& os, TestOctree<Dim> const& octree) {
+		os << to_string(octree);
+	}
+};
+
+template<>
+struct print_log_value<CheckOctreeResult> {
+	void operator()(std::ostream& os, CheckOctreeResult check) {
+		os << to_string(check);
 	}
 };
 
@@ -102,45 +144,9 @@ struct print_log_value<std::vector<T> > {
 	}
 };
 
-template<std::size_t Dim>
-struct print_log_value<TestOctree<Dim> > {
-	void operator()(std::ostream& os, TestOctree<Dim> const& octree) {
-		os << "Octree(";
-		os << "node capacity: " << octree.nodeCapacity() << ", ";
-		os << "max depth: " << octree.maxDepth() << ", ";
-		os << "position: ";
-		print_log_value<Vector<Dim> >()(
-			os,
-			octree.nodes().begin().position());
-		os << ", ";
-		os << "dimensions: ";
-		print_log_value<Vector<Dim> >()(
-			os,
-			octree.nodes().begin().dimensions());
-		os << ")";
-	}
-};
-
 }
 }
 }
-
-enum class CheckOctreeResult {
-	Success,
-	RootHasParent,
-	LeafDuplicate,
-	LeafMissing,
-	DepthIncorrect,
-	LeafPositionMismatch,
-	LeafOutOfBounds,
-	NodeOverCapacity,
-	NodeOverDepth,
-	NodeUnderCapacity,
-	ChildParentMismatch,
-	LeafNotInChild,
-	LeafNotInParent,
-	ChildCountMismatch,
-};
 
 // A collection of different octrees with various parameters.
 static auto const octreeData =
@@ -154,61 +160,63 @@ static auto const octreeData =
 	bdata::make(TestOctree<3>({-48.0, -32.0, 8.0}, {+64.0, +128.0, 4.0}, 3, 4));
 
 // A set of leaf pair lists that can be used to construct octrees.
-static auto const leafPairsData = bdata::make({
-	// Shallow octree with a single point in each octant.
-	std::vector<LeafPair<3> > {
-		LeafPair<3> {Leaf(0), {4,  4,  4}},
-		LeafPair<3> {Leaf(1), {12, 4,  4}},
-		LeafPair<3> {Leaf(2), {4,  12, 4}},
-		LeafPair<3> {Leaf(3), {12, 12, 4}},
-		LeafPair<3> {Leaf(4), {4,  4,  12}},
-		LeafPair<3> {Leaf(5), {12, 4,  12}},
-		LeafPair<3> {Leaf(6), {4,  12, 12}},
-		LeafPair<3> {Leaf(7), {12, 12, 12}},
-	},
-	// Deep octree with many leafs at the same point.
-	std::vector<LeafPair<3> > {
-		LeafPair<3> {Leaf(0), {13, 13, 13}},
-		LeafPair<3> {Leaf(1), {13, 13, 13}},
-		LeafPair<3> {Leaf(2), {13, 13, 13}},
-		LeafPair<3> {Leaf(4), {13, 13, 13}},
-	},
-	// Complex quadtree with points in many various locations.
-	std::vector<LeafPair<3> > {
-		LeafPair<3> {Leaf(0),  {1,  2,  1}},
-		LeafPair<3> {Leaf(1),  {6,  2,  1}},
-		LeafPair<3> {Leaf(2),  {6,  6,  1}},
-		LeafPair<3> {Leaf(3),  {3,  2,  1}},
-		LeafPair<3> {Leaf(4),  {2,  6,  1}},
-		LeafPair<3> {Leaf(5),  {14, 6,  1}},
-		LeafPair<3> {Leaf(6),  {6,  14, 1}},
-		LeafPair<3> {Leaf(7),  {6,  10, 1}},
-		LeafPair<3> {Leaf(8),  {2,  10, 1}},
-		LeafPair<3> {Leaf(9),  {2,  14, 1}},
-		
-		LeafPair<3> {Leaf(10), {10, 6,  1}},
-		LeafPair<3> {Leaf(11), {10, 2,  1}},
-		LeafPair<3> {Leaf(12), {9,  9,  1}},
-		LeafPair<3> {Leaf(13), {15, 1,  1}},
-		LeafPair<3> {Leaf(14), {13, 3,  1}},
-		LeafPair<3> {Leaf(15), {15, 3,  1}},
-		LeafPair<3> {Leaf(16), {13, 1,  1}},
-		LeafPair<3> {Leaf(17), {11, 9,  1}},
-		LeafPair<3> {Leaf(18), {9,  11, 1}},
-		LeafPair<3> {Leaf(19), {11, 11, 1}},
-		
-		LeafPair<3> {Leaf(20), {15, 9,  1}},
-		LeafPair<3> {Leaf(21), {15, 13, 1}},
-		LeafPair<3> {Leaf(22), {15, 11, 1}},
-		LeafPair<3> {Leaf(23), {15, 15, 1}},
-		LeafPair<3> {Leaf(24), {13, 9,  1}},
-		LeafPair<3> {Leaf(25), {13, 13, 1}},
-		LeafPair<3> {Leaf(26), {11, 13, 1}},
-		LeafPair<3> {Leaf(27), {9,  13, 1}},
-		LeafPair<3> {Leaf(28), {11, 15, 1}},
-		LeafPair<3> {Leaf(29), {9,  15, 1}},
-	},
-});
+static auto const leafPairsData = bdata::make(
+	std::vector<std::vector<LeafPair<3> > > {
+		// Shallow octree with a single point in each octant.
+		std::vector<LeafPair<3> > {
+			LeafPair<3> {Leaf(0), {4,  4,  4}},
+			LeafPair<3> {Leaf(1), {12, 4,  4}},
+			LeafPair<3> {Leaf(2), {4,  12, 4}},
+			LeafPair<3> {Leaf(3), {12, 12, 4}},
+			LeafPair<3> {Leaf(4), {4,  4,  12}},
+			LeafPair<3> {Leaf(5), {12, 4,  12}},
+			LeafPair<3> {Leaf(6), {4,  12, 12}},
+			LeafPair<3> {Leaf(7), {12, 12, 12}},
+		},
+		// Deep octree with many leafs at the same point.
+		std::vector<LeafPair<3> > {
+			LeafPair<3> {Leaf(0), {13, 13, 13}},
+			LeafPair<3> {Leaf(1), {13, 13, 13}},
+			LeafPair<3> {Leaf(2), {13, 13, 13}},
+			LeafPair<3> {Leaf(3), {13, 13, 13}},
+		},
+		// Complex quadtree with points in many various locations.
+		std::vector<LeafPair<3> > {
+			LeafPair<3> {Leaf(0),  {1,  2,  1}},
+			LeafPair<3> {Leaf(1),  {6,  2,  1}},
+			LeafPair<3> {Leaf(2),  {6,  6,  1}},
+			LeafPair<3> {Leaf(3),  {3,  2,  1}},
+			LeafPair<3> {Leaf(4),  {2,  6,  1}},
+			LeafPair<3> {Leaf(5),  {14, 6,  1}},
+			LeafPair<3> {Leaf(6),  {6,  14, 1}},
+			LeafPair<3> {Leaf(7),  {6,  10, 1}},
+			LeafPair<3> {Leaf(8),  {2,  10, 1}},
+			LeafPair<3> {Leaf(9),  {2,  14, 1}},
+			
+			LeafPair<3> {Leaf(10), {10, 6,  1}},
+			LeafPair<3> {Leaf(11), {10, 2,  1}},
+			LeafPair<3> {Leaf(12), {9,  9,  1}},
+			LeafPair<3> {Leaf(13), {15, 1,  1}},
+			LeafPair<3> {Leaf(14), {13, 3,  1}},
+			LeafPair<3> {Leaf(15), {15, 3,  1}},
+			LeafPair<3> {Leaf(16), {13, 1,  1}},
+			LeafPair<3> {Leaf(17), {11, 9,  1}},
+			LeafPair<3> {Leaf(18), {9,  11, 1}},
+			LeafPair<3> {Leaf(19), {11, 11, 1}},
+			
+			LeafPair<3> {Leaf(20), {15, 9,  1}},
+			LeafPair<3> {Leaf(21), {15, 13, 1}},
+			LeafPair<3> {Leaf(22), {15, 11, 1}},
+			LeafPair<3> {Leaf(23), {15, 15, 1}},
+			LeafPair<3> {Leaf(24), {13, 9,  1}},
+			LeafPair<3> {Leaf(25), {13, 13, 1}},
+			LeafPair<3> {Leaf(26), {11, 13, 1}},
+			LeafPair<3> {Leaf(27), {9,  13, 1}},
+			LeafPair<3> {Leaf(28), {11, 15, 1}},
+			LeafPair<3> {Leaf(29), {9,  15, 1}},
+		},
+	}
+);
 
 // A list of leaf positions at every possible position.
 static auto const singleLeafPairData = bdata::make([]() {
@@ -232,18 +240,6 @@ static auto const singleLeafData = bdata::make([]() {
 	return result; 
 }());
 
-// Takes an octree and a list of leaf-position pairs that should be contained
-// within it. Checks the structure of the octree to make sure that the leafs
-// are located at appropriate locations within the octree.
-template<std::size_t Dim>
-static CheckOctreeResult checkOctree(
-		TestOctree<Dim> const& octree,
-		std::vector<LeafPair<Dim> > allLeafPairs);
-
-// Does the same thing as checkOctree, except does a BOOST_REQUIRE that the
-// octree has a valid state.
-static std::string checkOctreeString(CheckOctreeResult check);
-
 // Constructs an empty octree, and then inserts a number of points into it.
 BOOST_DATA_TEST_CASE(
 		OctreeFillTest,
@@ -255,14 +251,12 @@ BOOST_DATA_TEST_CASE(
 	TestOctree<3> octree = emptyOctree;
 	std::vector<LeafPair<3> > addedLeafPairs;
 	for (auto it = leafPairs.begin(); it != leafPairs.end(); ++it) {
+		BOOST_TEST_CHECKPOINT("preparing to add " + to_string(*it));
 		addedLeafPairs.push_back(*it);
 		octree.insert(*it);
+		BOOST_TEST_CHECKPOINT("finished adding " + to_string(*it));
 		CheckOctreeResult check = checkOctree(octree, addedLeafPairs);
-		BOOST_REQUIRE_MESSAGE(
-			check == CheckOctreeResult::Success,
-			"failed when adding leaf with data " +
-			std::to_string(std::get<Leaf>(*it).data) + ": " +
-			checkOctreeString(check));
+		BOOST_REQUIRE_EQUAL(check, CheckOctreeResult::Success);
 	}
 }
 /*
@@ -467,9 +461,56 @@ CheckOctreeResult checkOctree(
 	return CheckOctreeResult::Success;
 }
 
-std::string checkOctreeString(CheckOctreeResult check) {
+template<std::size_t Dim>
+std::string to_string(Vector<Dim> vector) {
+	std::ostringstream os;
+	os << "<";
+	if (Dim != 0) {
+		os << vector[0];
+	}
+	for (std::size_t dim = 1; dim < Dim; ++dim) {
+		os << ", " << vector[dim];
+	}
+	os << ">";
+	return os.str();
+}
+
+std::string to_string(Leaf leaf) {
+	std::ostringstream os;
+	os << "Leaf(" << leaf.data << ")";
+	return os.str();
+}
+
+template<std::size_t Dim>
+std::string to_string(LeafPair<Dim> pair) {
+	std::ostringstream os;
+	os << "(";
+	os << to_string(std::get<Leaf>(pair)) << ", ";
+	os << to_string(std::get<Vector<Dim> >(pair)) << ")";
+	return os.str();
+}
+
+template<std::size_t Dim>
+std::string to_string(TestOctree<Dim> octree) {
+	std::ostringstream os;
+	os << "Octree(";
+	os << "node capacity: " << octree.nodeCapacity() << ", ";
+	os << "max depth: " << octree.maxDepth() << ", ";
+	os << "position: ";
+	os << to_string(octree.nodes().begin().position());
+	os << ", ";
+	os << "dimensions: ";
+	os << to_string(octree.nodes().begin().dimensions());
+	os << ")";
+	return os.str();
+}
+
+std::string to_string(CheckOctreeResult check) {
 	std::string error;
 	switch (check) {
+	case CheckOctreeResult::Success:
+		error = "success";
+		break;
 	case CheckOctreeResult::RootHasParent:
 		error = "root node has parent";
 		break;
