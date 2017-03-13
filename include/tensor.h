@@ -127,6 +127,11 @@ public:
 		return _values[index];
 	}
 	
+	Tensor<N, M, Dim>& operator=(std::initializer_list<Scalar> rhs) {
+		Tensor<N, M, Dim> rhsTensor = rhs;
+		return *this = rhsTensor;
+	}
+	
 	Tensor<N, M, Dim>& operator+=(Tensor<N, M, Dim> const& rhs) {
 		for (std::size_t index = 0; index < Dim; ++index) {
 			operator[](index) += rhs[index];
