@@ -334,6 +334,34 @@ public:
 	
 	///@{
 	/**
+	 * \brief Adds a new leaf to the Octree.
+	 * 
+	 * If the optional `hint` parameter is provided, then this method will begin
+	 * its search for the node to insert the leaf at the `hint` node.
+	 * 
+	 * The provided data should be packaged in a tuple. It will be accessed
+	 * the `std::get` method.
+	 * 
+	 * NodeIterator%s and LeafIterator%s may be invalidated.
+	 * 
+	 * \param hint a starting guess as to where the leaf should be placed
+	 * \param leafPair a tuple containing both the leaf and its position
+	 * 
+	 * \return a tuple containing the NodeIterator to the node that the
+	 * leaf was added to, and a LeafIterator to the new leaf
+	 */
+	template<typename LeafTuple>
+	std::tuple<NodeIterator, LeafIterator> insert(
+			LeafTuple leafPair);
+	
+	template<typename LeafTuple>
+	std::tuple<NodeIterator, LeafIterator> insert(
+			ConstNodeIterator hint,
+			LeafTuple leafPair);
+	///@}
+	
+	///@{
+	/**
 	 * \brief Removes an leaf from the Octree.
 	 * 
 	 * If the optional `hint` parameter is provided, then this method will begin

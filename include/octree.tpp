@@ -311,6 +311,33 @@ Octree<L, N, Dim>::insert(
 }
 
 template<typename L, typename N, std::size_t Dim>
+template<typename LeafTuple>
+std::tuple<
+		typename Octree<L, N, Dim>::NodeIterator,
+		typename Octree<L, N, Dim>::LeafIterator>
+Octree<L, N, Dim>::insert(
+		ConstNodeIterator hint,
+		LeafTuple leafPair) {
+	return insert(
+		hint,
+		std::get<L>(leafPair),
+		std::get<Vector<Dim> >(leafPair));
+}
+
+template<typename L, typename N, std::size_t Dim>
+template<typename LeafTuple>
+std::tuple<
+		typename Octree<L, N, Dim>::NodeIterator,
+		typename Octree<L, N, Dim>::LeafIterator>
+Octree<L, N, Dim>::insert(
+		LeafTuple leafPair) {
+	return insert(
+		nodes().begin(),
+		std::get<L>(leafPair),
+		std::get<Vector<Dim> >(leafPair));
+}
+
+template<typename L, typename N, std::size_t Dim>
 std::tuple<
 		typename Octree<L, N, Dim>::NodeIterator,
 		typename Octree<L, N, Dim>::LeafIterator>
