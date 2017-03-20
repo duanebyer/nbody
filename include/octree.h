@@ -86,10 +86,7 @@ public:
 	/**
 	 * \brief Proxy type that acts as a reference to a Leaf.
 	 * 
-	 * This type is able to mimic the behaviour of the `Leaf&` type in most
-	 * cases. However, pointers to this type do not behave correctly. For
-	 * example, the expression `&leafReferenceProxyInstance` does not work as
-	 * expected.
+	 * \see LeafReferenceProxyBase
 	 */
 	using LeafReferenceProxy = LeafReferenceProxyBase<false>;
 	using ConstLeafReferenceProxy = LeafReferenceProxyBase<true>;
@@ -99,10 +96,7 @@ public:
 	/**
 	 * \brief Proxy type that acts as a reference to a Node.
 	 * 
-	 * This type is able to mimic the behaviour of the `Node&` type in most
-	 * cases. However, pointers to this type do not behave correctly. For
-	 * example, the expression `&nodeReferenceProxyInstance` does not work as
-	 * expected.
+	 * \see NodeReferenceProxyBase
 	 */
 	using NodeReferenceProxy = NodeReferenceProxyBase<false>;
 	using ConstNodeReferenceProxy = NodeReferenceProxyBase<true>;
@@ -125,17 +119,10 @@ public:
 	
 	///@{
 	/**
-	 * \brief Pseudo-container that provides access to the leaves of the Octree
-	 * without allowing for insertion or deletion of elements.
-	 */
-	using LeafRange = LeafRangeBase<false>;
-	using ConstLeafRange = LeafRangeBase<true>;
-	///@}
-	
-	///@{
-	/**
 	 * \brief Depth-first iterator over all of the leaves contained in the
 	 * Octree.
+	 * 
+	 * \see LeafIteratorBase
 	 */
 	using LeafIterator = LeafIteratorBase<false, false>;
 	using ConstLeafIterator = LeafIteratorBase<true, false>;
@@ -145,22 +132,37 @@ public:
 	
 	///@{
 	/**
-	 * \brief Pseudo-container that provides access to the nodes of the Octree
+	 * \brief Pseudo-container that provides access to the leaves of the Octree
 	 * without allowing for insertion or deletion of elements.
+	 * 
+	 * \see LeafRangeBase
 	 */
-	using NodeRange = NodeRangeBase<false>;
-	using ConstNodeRange = NodeRangeBase<true>;
+	using LeafRange = LeafRangeBase<false>;
+	using ConstLeafRange = LeafRangeBase<true>;
 	///@}
 	
 	///@{
 	/**
 	 * \brief Depth-first iterator over all of the nodes contained in the
 	 * Octree.
+	 * 
+	 * \see NodeIteratorBase
 	 */
 	using NodeIterator = NodeIteratorBase<false, false>;
 	using ConstNodeIterator = NodeIteratorBase<true, false>;
 	using ReverseNodeIterator = NodeIteratorBase<false, true>;
 	using ConstReverseNodeIterator = NodeIteratorBase<true, true>;
+	///@}
+	
+	///@{
+	/**
+	 * \brief Pseudo-container that provides access to the nodes of the Octree
+	 * without allowing for insertion or deletion of elements.
+	 * 
+	 * \see NodeRangeBase
+	 */
+	using NodeRange = NodeRangeBase<false>;
+	using ConstNodeRange = NodeRangeBase<true>;
 	///@}
 	
 private:
@@ -177,7 +179,7 @@ private:
 		L value;
 		Vector<Dim> position;
 		
-		Leaf(L value, Vector<Dim> position) :
+		LeafInternal(L value, Vector<Dim> position) :
 				value(value),
 				position(position) {
 		}
@@ -221,7 +223,7 @@ private:
 		N value;
 		
 		// By default, a node is constructed as if it were an empty root node.
-		Node() :
+		NodeInternal() :
 				depth(0),
 				hasChildren(false),
 				childIndices(),
@@ -327,10 +329,7 @@ public:
 	
 	///@{
 	/**
-	 * \brief Gets a pseudo-container that contains the leaves of the Octree.
-	 * 
-	 * The leaves are returned in depth-first order. See LeafRangeBase for
-	 * the API of the resulting container.
+	 * \brief Gets a range that contains the leaves of the Octree.
 	 */
 	LeafRange leafs();
 	ConstLeafRange leafs() const;
@@ -339,11 +338,7 @@ public:
 	
 	///@{
 	/**
-	 * \brief Gets a pseudo-container that contains the nodes of the Octree.
-	 * 
-	 * The nodes are returned in depth-first order, with the root node as the
-	 * first element in the container. See NodeRangeBase for the API of the
-	 * resulting container.
+	 * \brief Gets a range that contains the nodes of the Octree.
 	 */
 	NodeRange nodes();
 	ConstNodeRange nodes() const;
@@ -639,7 +634,12 @@ public:
 
 
 
-// TODO: Doxygen comment block
+/**
+ * \brief Provides access to a leaf of the Octree.
+ * 
+ * Note that this type is a proxy to the actual implementation type. Internally,
+ * Octree uses a private type to store the leaf data.
+ */
 template<typename L, typename N, std::size_t Dim>
 struct Octree<L, N, Dim>::Leaf final {
 	
@@ -655,7 +655,16 @@ struct Octree<L, N, Dim>::Leaf final {
 
 
 
-// TODO: Doxygen comment block
+/**
+ * \brief Proxy type that acts as a reference to a Leaf.
+ * 
+ * This type is able to mimic the behaviour of the `Leaf&` type in most
+ * cases. However, pointers to this type do not behave correctly. For
+ * example, the address-of operator does not work as it would for a true
+ * reference.
+ * 
+ * \tparam Const whether this is a `const` variant of the reference
+ */
 template<typename L, typename N, std::size_t Dim>
 template<bool Const>
 struct Octree<L, N, Dim>::LeafReferenceProxyBase final {
@@ -704,11 +713,12 @@ public:
 /**
  * \brief An iterator over the LeafRangeBase container.
  * 
- * The leaves are iterated over in depth-first order.
+ * The Leaf%s are iterated over in depth-first order.
  * 
- * This iterator meets the requirements of `RandomAccessIterator`. It also
- * contains some simple functions for querying the properties of a leaf of an
- * Octree.
+ * This iterator meets the requirements of `InputIterator`. It would also
+ * the requirements of `BidirectionalIterator` except that the reference type
+ * used by this iterator is not `Leaf&`. A proxy reference type
+ * LeafReferenceProxyBase is used instead.
  * 
  * \tparam Const whether this is a `const` variant of the iterator
  * \tparam Reverse whether this is a reverse or forward iterator
@@ -738,6 +748,7 @@ private:
 			Octree<L, N, Dim> const*,
 			Octree<L, N, Dim>*>;
 	
+	// This type is used by the arrow (->) operator.
 	struct PointerProxy {
 		
 		ReferenceProxy reference;
@@ -989,12 +1000,31 @@ public:
 
 
 
-// TODO: Doxygen comment here
+/**
+ * \brief Provides access to a node of the Octree.
+ * 
+ * Note that this type is a proxy to the actual implementation type. Internally,
+ * Octree uses a private type to store the node data.
+ * 
+ * This type comes in `const` and non-`const` variants, since it provides access
+ * to traversal of the Octree. The `const` variant stores ConstNodeIterator%s to
+ * the parent and children of this node, while the non-`const` variant stores
+ * NodeIterator%s.
+ * 
+ * \tparam Const whether this is a `const` variant of the node
+ */
 template<typename L, typename N, std::size_t Dim>
 template<bool Const>
 struct Octree<L, N, Dim>::Node final {
 	
 	NodeIteratorBase<Const> const parent;
+	/**
+	 * \brief An array of iterators, one to each child of the Node.
+	 * 
+	 * Note that this array has a length of 1 larger than the actual number of
+	 * children. The last element of the array points to the next sibling of
+	 * this Node.
+	 */
 	NodeIteratorBase<Const> const children[(1 << Dim) + 1];
 	
 	LeafRangeBase<Const> const leafs;
@@ -1002,7 +1032,14 @@ struct Octree<L, N, Dim>::Node final {
 	bool const hasParent;
 	bool const hasChildren;
 	
-	NodeList::size_type depth;
+	/**
+	 * \brief The number of generations below the root node that this node is
+	 * located.
+	 * 
+	 * The root node has a depth of 0, its children have a depth of 1, and so
+	 * on.
+	 */
+	NodeList::size_type const depth;
 	
 	Vector<Dim> const position;
 	Vector<Dim> const dimensions;
@@ -1030,7 +1067,16 @@ struct Octree<L, N, Dim>::Node final {
 
 
 
-// TODO: Doxygen comment here
+/**
+ * \brief Proxy type that acts as a reference to a Node.
+ * 
+ * This type is able to mimic the behaviour of the `Node&` type in most
+ * cases. However, pointers to this type do not behave correctly. For
+ * example, the address-of operator does not work as it would for a true
+ * reference.
+ * 
+ * \tparam Const whether this is a `const` variant of the reference
+ */
 template<typename L, typename N, std::size_t Dim>
 template<Const>
 struct Octree<L, N, Dim>::NodeReferenceProxyBase final {
@@ -1118,15 +1164,15 @@ public:
 
 
 
-// TODO: this needs to be ripped out and remade.
 /**
  * \brief An iterator over the NodeRangeBase container.
  * 
- * The nodes are iterated over in depth-first order.
+ * The Node%s are iterated over in depth-first order.
  * 
- * This iterator meets the requirements of `RandomAccessIterator`. It also
- * contains some simple functions for querying the properties of a node of an
- * Octree.
+ * This iterator meets the requirements of `InputIterator`. It would also
+ * the requirements of `BidirectionalIterator` except that the reference type
+ * used by this iterator is not `Node&`. A proxy reference type
+ * NodeReferenceProxyBase is used instead.
  * 
  * \tparam Const whether this is a `const` variant of the iterator
  * \tparam Reverse whether this is a reverse or forward iterator
@@ -1156,6 +1202,7 @@ private:
 			Octree<L, N, Dim> const*,
 			Octree<L, N, Dim>*>;
 	
+	// This type is used by the arrow (->) operator.
 	struct PointerProxy {
 		
 		ReferenceProxy reference;
