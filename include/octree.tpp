@@ -102,9 +102,7 @@ typename Octree<L, N, Dim>::NodeIterator Octree<L, N, Dim>::destroyChildren(
 		NodeIterator node) {
 	// Determine how many children, grandchildren, great-grandchildren, ...
 	// of this node.
-	NodeList::size_type numDescendants = (NodeList::size_type) (
-		node->children[1 << Dim].internalIt() -
-		node->children[0].internalIt());
+	NodeList::size_type numDescendants = descendants(node).size();
 	
 	// Destroy the subnodes. This won't invalidate the node iterator.
 	_nodes.erase(
