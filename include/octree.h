@@ -40,39 +40,44 @@ class Octree final {
 public:
 	
 	static_assert(
-			std::is_default_constructible<N>::value,
-			"type N must be default constructible");
+		std::is_default_constructible<N>::value,
+		"type N must be default constructible");
 	static_assert(
-			std::is_copy_assignable<N>::value,
-			"type N must be copy assignable");
+		std::is_copy_assignable<N>::value,
+		"type N must be copy assignable");
 	static_assert(
-			std::is_copy_constructible<N>::value,
-			"type N must be copy constructible");
+		std::is_copy_constructible<N>::value,
+		"type N must be copy constructible");
 	static_assert(
-			std::is_copy_assignable<L>::value,
-			"type L must be copy assignable");
+		std::is_copy_assignable<L>::value,
+		"type L must be copy assignable");
 	static_assert(
-			std::is_copy_constructible<L>::value,
-			"type L must be copy constructible");
+		std::is_copy_constructible<L>::value,
+		"type L must be copy constructible");
 	
 	// These classes are used as proxies for accessing the nodes and leafs of
 	// the octree.
 	
-	class Leaf;
+	struct Leaf;
 	
 	template<bool Const>
-	class LeafReferenceProxyBase;
+	struct LeafReferenceProxyBase;
 	
 	template<bool Const>
-	class LeafPointerProxyBase;
-	
-	class Node;
+	struct NodeBase;
 	
 	template<bool Const>
-	class NodeReferenceProxyBase;
+	struct NodeReferenceProxyBase;
 	
-	template<bool Const>
-	class NodePointerProxyBase;
+	using Node = NodeBase<false>;
+	using ConstNode = NodeBase<true>;
+	
+	// TODO: Doxygen comment here
+	using LeafReferenceProxy = LeafReferenceProxyBase<false>;
+	using ConstLeafReferenceProxy = LeafReferenceProxyBase<true>;
+	
+	using NodeReferenceProxy = NodeReferenceProxyBase<false>;
+	using ConstNodeReferenceProxy = NodeReferenceProxyBase<true>;
 	
 	// These classes are used to construct const-variants and reverse-variants
 	// of the public range and iterator classes.
@@ -88,17 +93,6 @@ public:
 	
 	template<bool Const>
 	class NodeRangeBase;
-	
-	// TODO: Doxygen comment here
-	using LeafReferenceProxy = LeafReferenceProxyBase<false>;
-	using ConstLeafReferenceProxy = LeafReferenceProxyBase<true>;
-	using LeafPointerProxy = LeafPointerProxyBase<false>;
-	using ConstLeafPointerProxy = LeafPointerProxyBase<true>;
-	
-	using NodeReferenceProxy = NodeReferenceProxyBase<false>;
-	using ConstNodeReferenceProxy = NodeReferenceProxyBase<true>;
-	using NodePointerProxy = NodePointerProxyBase<false>;
-	using ConstNodePointerProxy = NodePointerProxyBase<true>;
 	
 	///@{
 	/**
@@ -165,7 +159,7 @@ private:
 	struct NodeInternal final {
 		
 		// The depth of this node within the octree (0 for root, and so on).
-		std::size_t depth;
+		NodeList::size_type depth;
 		
 		// Whether this node has any children.
 		bool hasChildren;
@@ -173,22 +167,22 @@ private:
 		// index of this node. The last entry points to the next sibling of this
 		// node, and is used to determine the total size of all of this node's
 		// children.
-		std::size_t childIndices[(1 << Dim) + 1];
+		NodeList::size_type childIndices[(1 << Dim) + 1];
 		
 		// Whether this node has a parent.
 		bool hasParent;
 		// The relative index of the parent of this node.
-		std::ptrdiff_t parentIndex;
+		NodeList::difference_type parentIndex;
 		// Which child # of its parent this node is. (0th child, 1st child,
 		// etc).
-		std::size_t siblingIndex;
+		NodeList::size_type siblingIndex;
 		
 		// The number of leaves that this node contains. This includes leaves
 		// stored by all descendants of this node.
-		std::size_t leafCount;
+		LeafList::size_type leafCount;
 		// The index within the octree's leaf array that this node's leaves are
 		// located at.
-		std::size_t leafIndex;
+		LeafList::size_type leafIndex;
 		
 		// The section of space that this node encompasses.
 		Vector<Dim> position;
@@ -221,10 +215,10 @@ private:
 	NodeList _nodes;
 	
 	// The number of leaves to store at a single node of the octree.
-	std::size_t _nodeCapacity;
+	LeafList::size_type _nodeCapacity;
 	
 	// The maximum depth of the octree.
-	std::size_t _maxDepth;
+	NodeList::size_type _maxDepth;
 	
 	// Whether the tree should be automatically readjust itself so that each
 	// node has less leaves than the node capacity, as well as having as few
@@ -233,6 +227,16 @@ private:
 	bool _adjust;
 	
 	
+	
+	// Determines whether a node can store a certain number of additional (or
+	// fewer) leafs.
+	bool canHoldLeafs(
+			ConstNodeIterator node,
+			LeafList::difference_type n) const {
+		return
+			node->leafs.size() + n <= _nodeCapacity ||
+			node->depth >= _maxDepth;
+	}
 	
 	// Divides a node into a set of subnodes and partitions its leaves between
 	// them. This function may reorganize the leaf vector (some leaf iterators
@@ -245,10 +249,15 @@ private:
 	NodeIterator destroyChildren(NodeIterator node);
 	
 	// Adds a leaf to a specific node.
-	LeafIterator insertAt(NodeIterator node, Leaf const& leaf);
+	LeafIterator insertAt(
+			NodeIterator node,
+			L const& leaf,
+			Vector<Dim> const& position);
 	
 	// Removes a leaf from a node.
-	LeafIterator eraseAt(NodeIterator node, LeafIterator leaf);
+	LeafIterator eraseAt(
+			NodeIterator node,
+			LeafIterator leaf);
 	
 	// Moves a leaf from this node to another one.
 	LeafIterator moveAt(
@@ -273,14 +282,14 @@ public:
 	Octree(
 			Vector<Dim> position,
 			Vector<Dim> dimensions,
-			std::size_t nodeCapacity = 1,
-			std::size_t maxDepth = sizeof(Scalar) * CHAR_BIT,
+			LeafList::size_type nodeCapacity = 1,
+			NodeList::size_type maxDepth = sizeof(Scalar) * CHAR_BIT,
 			bool adjust = true);
 	
-	std::size_t nodeCapacity() const {
+	LeafList::size_type nodeCapacity() const {
 		return _nodeCapacity;
 	}
-	std::size_t maxDepth() const {
+	NodeList::size_type maxDepth() const {
 		return _maxDepth;
 	}
 	bool adjust() const {
@@ -311,6 +320,16 @@ public:
 	ConstNodeRange nodes() const;
 	ConstNodeRange cnodes() const;
 	///@}
+	
+	// TODO: doxygen comment
+	NodeIterator root();
+	ConstNodeIterator root() const;
+	ConstNodeRange croot() const;
+	
+	// TODO: doxygen comment
+	NodeRange descendants(NodeIterator node);
+	ConstNodeRange descendants(ConstNodeIterator node) const;
+	ConstNodeRange cdescendants(ConstNodeIterator node) const;
 	
 	///@{
 	/**
@@ -509,39 +528,61 @@ public:
 	}
 	///@}
 	
+	// TODO: add doxygen comment
+	NodeIterator findChild(
+			ConstNodeIterator node,
+			Vector<Dim> const& point);
+	ConstNodeIterator findChild(
+			ConstNodeIterator node,
+			Vector<Dim> const& point) const {
+		return const_cast<Octree<L, N, Dim>*>(this)->findChild(node, point);
+	}
+	
+	// TODO: add doxygen comment
+	NodeIterator findChild(
+			ConstNodeIterator node,
+			ConstLeafIterator leaf);
+	ConstNodeIterator findChild(
+			ConstNodeIterator node,
+			ConstLeafIterator leaf) {
+		return const_cast<Octree<L, N, Dim>*>(this)->findChild(node, leaf);
+	}
+	
+	// TODO: add Doxygen comment here
+	bool contains(ConstNodeIterator node, Vector<Dim> const& point) const {
+		for (std::size_t dim = 0; dim < Dim; ++dim) {
+			if (!(
+					point[dim] >= node->position[dim] &&
+					point[dim] < node->position[dim] + node->dimensions[dim])) {
+				return false;
+			}
+		}
+		return true;
+	}
+	
+	// TODO: add Doxygen comment here
+	bool contains(ConstNodeIterator node, ConstLeafIterator leaf) const {
+		LeafList::difference_type index = node.internalIt()->leafIndex;
+		LeafList::size_type count = node.internalIt()->leafCount;
+		return
+			leaf._index >= index &&
+			leaf._index < index + count;
+	}
+	
 };
 
 
 
 // TODO: Doxygen comment block
 template<typename L, typename N, std::size_t Dim>
-class Octree<L, N, Dim>::Leaf final {
+struct Octree<L, N, Dim>::Leaf final {
 	
-private:
-	
-	template<bool Const>
-	friend Octree<L, N, Dim>::LeafReferenceProxyBase;
-	
-	Vector<Dim> const _position;
-	L _value;
+	Vector<Dim> const position;
+	L value;
 	
 	Leaf(Vector<Dim> position, L value) :
-			_position(position),
-			_value(value) {
-	}
-	
-public:
-	
-	Vector<Dim> const& position() const {
-		return _position;
-	}
-	
-	L const& value() const {
-		return _value;
-	}
-	
-	L& value() {
-		return _value;
+			position(position),
+			value(value) {
 	}
 	
 };
@@ -551,77 +592,43 @@ public:
 // TODO: Doxygen comment block
 template<typename L, typename N, std::size_t Dim>
 template<bool Const>
-class Octree<L, N, Dim>::LeafReferenceProxyBase final {
+struct Octree<L, N, Dim>::LeafReferenceProxyBase final {
 	
 private:
-	
-	template<bool Const_>
-	friend class Octree<L, N, Dim>::LeafPointerProxyBase;
 	
 	template<bool Const_, bool Reverse_>
 	friend class Octree<L, N, Dim>::LeafIteratorBase;
 	
-	using List = LeafList;
-	using OctreePointer = std::conditional_t<
+	using LeafReference = std::conditional_t<
 		Const,
-		Octree<L, N, Dim> const*,
-		Octree<L, N, Dim>*>;
+		Leaf const&,
+		Leaf&>;
+	using ValueReference = std::conditional_t<
+		Const,
+		L const&,
+		L>;
 	
-	OctreePointer const _octree;
-	List::size_type const _index;
-	
-	LeafReferenceProxyBase(OctreePointer octree, List::size_type index) :
-			_octree(octree),
-			_index(index) {
+	LeafReferenceProxyBase(Vector<Dim> const& position, ValueReference value) :
+		position(position),
+		value(value) {
 	}
 	
 public:
 	
-	Vector<Dim> const& position() const {
-		return _octree->_leafs[_index].position;
-	}
+	Vector<Dim> const& position;
+	ValueReference value;
 	
-	std::conditional_t<Const, L const&, L&> value() const {
-		return _octree->_leafs[_index].value;
+	LeafReferenceProxyBase(LeafReference leaf) :
+			position(leaf.position),
+			value(leaf.value) {
 	}
 	
 	operator LeafReferenceProxyBase<true>() const {
-		return LeafReferenceProxyBase<true>(_octree, _index);
+		return LeafReferenceProxyBase<true>(position, value);
 	}
 	
 	operator Leaf() const {
-		return Leaf(
-			_octree->_leafs[_index].position,
-			_octree->_leafs[_index].value);
-	}
-	
-};
-
-
-
-// TODO: Doxygen comment here
-template<typename L, typename N, std::size_t Dim>
-template<bool Const>
-class Octree<L, N, Dim>::LeafPointerProxyBase final {
-	
-private:
-	
-	using Reference = LeafReferenceProxyBase<Const>;
-	
-	Reference const _reference;
-	
-	LeafPointerProxyBase(Reference reference) :
-			_reference(reference) {
-	}
-	
-public:
-	
-	Reference* operator->() const {
-		return &_reference;
-	}
-	
-	Reference operator*() const {
-		return _reference;
+		return Leaf(position, value);
 	}
 	
 };
@@ -651,19 +658,33 @@ private:
 	template<bool Const_>
 	friend class Octree<L, N, Dim>::LeafRangeBase;
 	
-	using List = Octree<L, N, Dim>::LeafList;
+	using ReferenceProxy = LeafReferenceProxyBase<Const>;
 	using ListIterator = std::conditional_t<
 			Const,
-			List::const_iterator,
-			List::iterator>;
+			LeafList::const_iterator,
+			LeafList::iterator>;
 	using ListReference = std::conditional_t<
 			Const,
-			List::const_reference,
-			List::reference>;
+			LeafList::const_reference,
+			LeafList::reference>;
 	using OctreePointer = std::conditional_t<
 			Const,
 			Octree<L, N, Dim> const*,
 			Octree<L, N, Dim>*>;
+	
+	struct PointerProxy {
+		
+		ReferenceProxy reference;
+		
+		PointerProxy(ReferenceProxy reference) :
+				reference(reference) {
+		}
+		
+		ReferenceProxy* operator->() const {
+			return &reference;
+		}
+		
+	};
 	
 	OctreePointer _octree;
 	List::difference_type _index;
@@ -673,11 +694,8 @@ private:
 			_index(index) {
 	}
 	
-	// These methods provide convenient access to the underlying list.
-	ListReference listRef() const {
-		return _octree->_leafs[_index];
-	}
-	ListIterator listIt() const {
+	// Converts this iterator to an iterator over the internal leaf type.
+	ListIterator internalIt() const {
 		return _octree->_leafs.begin() + _index;
 	}
 	
@@ -685,11 +703,16 @@ public:
 	
 	// Iterator typedefs.
 	using value_type = Leaf;
-	using reference = LeafReferenceProxyBase<Const>;
-	using pointer = LeafReferenceProxyBase<Const>*;
+	using reference = ReferenceProxy;
+	using pointer = PointerProxy;
 	using size_type = List::size_type;
 	using difference_type = List::difference_type;
 	using iterator_category = std::input_iterator_tag;
+	
+	LeafIteratorBase() :
+			_octree(NULL),
+			_index(0) {
+	}
 	
 	operator LeafIteratorBase<true, Reverse>() const {
 		return LeafIteratorBase<true, Reverse>(_octree, _index);
@@ -710,12 +733,12 @@ public:
 	
 	// Iterator element access methods.
 	reference operator*() const {
-		return LeafReferenceProxyBase<Const>(_octree, (size_type) _index);
+		return LeafReferenceProxyBase<Const>(
+			_octree->_leafs[_index].position,
+			_octree->_leafs[_index].value);
 	}
 	pointer operator->() const {
-		static thread_local LeafReferenceProxyBase<Const> ref;
-		ref = operator*();
-		return &ref;
+		return PointerProxy(operator*());
 	}
 	
 	// Iterator increment methods.
@@ -745,7 +768,7 @@ public:
 	friend bool operator==(
 			LeafIteratorBase<Const, Reverse> const& lhs,
 			LeafIteratorBase<Const, Reverse> const& rhs) {
-		return lhs._index == rhs._index;
+		return lhs._octree == rhs._octree && lhs._index == rhs._index;
 	}
 	friend bool operator!=(
 			LeafIteratorBase<Const, Reverse> const& lhs,
@@ -777,6 +800,7 @@ class Octree<L, N, Dim>::LeafRangeBase final {
 private:
 	
 	friend Octree<L, N, Dim>;
+	
 	template<bool Const_, bool Reverse_>
 	friend class Octree<L, N, Dim>::NodeIteratorBase;
 	
@@ -899,6 +923,135 @@ public:
 
 
 
+// TODO: Doxygen comment here
+template<typename L, typename N, std::size_t Dim>
+template<bool Const>
+struct Octree<L, N, Dim>::Node final {
+	
+	NodeIteratorBase<Const> const parent;
+	NodeIteratorBase<Const> const children[(1 << Dim) + 1];
+	
+	LeafRangeBase<Const> const leafs;
+	
+	bool const hasParent;
+	bool const hasChildren;
+	
+	NodeList::size_type depth;
+	
+	Vector<Dim> const position;
+	Vector<Dim> const dimensions;
+	
+	N value;
+	
+	Node(
+			NodeIteratorBase<Const> parent,
+			NodeIteratorBase<Const>[(1 << Dim) + 1] children,
+			LeafRangeBase<Const> leafs,
+			bool hasChildren,
+			Vector<Dim> position,
+			Vector<Dim> dimensions,
+			N value) :
+			parent(parent),
+			children(children),
+			leafs(leafs),
+			hasChildren(hasChildren),
+			position(position),
+			dimensions(dimensions),
+			value(value) {
+	}
+	
+};
+
+
+
+// TODO: Doxygen comment here
+template<typename L, typename N, std::size_t Dim>
+template<Const>
+struct Octree<L, N, Dim>::NodeReferenceProxyBase final {
+	
+private:
+	
+	template<bool Const_, bool Reverse_>
+	friend class Octree<L, N, Dim>::NodeIteratorBase;
+	
+	using NodeReference = std::conditional_t<
+		Const,
+		Node const&,
+		Node&>;
+	using ValueReference = std::conditional_t<
+		Const,
+		N const&,
+		N>;
+	
+	NodeReferenceProxyBase(
+		NodeIteratorBase<Const, false> parent,
+		NodeIteratorBase<Const, false> children[(1 << Dim) + 1],
+		LeafRangeBase<Const, false> leafs,
+		bool const& hasParent,
+		bool const& hasChildren,
+		std::size_t depth,
+		Vector<Dim> const& position,
+		Vector<Dim> const& dimensions,
+		ValueReference value) :
+		parent(parent),
+		children(children),
+		leafs(leafs),
+		hasChildren(hasChildren),
+		position(position),
+		dimensions(dimensions),
+		value(value) {
+	}
+	
+public:
+	
+	NodeIteratorBase<Const, false> const parent;
+	NodeIteratorBase<Const, false> const children[(1 << Dim) + 1];
+	
+	LeafRangeBase<Const, false> const leafs;
+	
+	bool const& hasParent;
+	bool const& hasChildren;
+	
+	std::size_t const& depth;
+	
+	Vector<Dim> const& position;
+	Vector<Dim> const& dimensions;
+	
+	ValueReference value;
+	
+	NodeReferenceProxyBase(NodeReference node) :
+			parent(node.parent),
+			children(node.children),
+			leafs(node.leafs),
+			hasParent(node.hasParent),
+			hasChildren(node.hasChildren),
+			depth(node.depth),
+			position(node.position),
+			dimensions(node.dimensions),
+			value(node.value) {
+	}
+	
+	operator NodeReferenceProxyBase<true>() const {
+		return NodeReferenceProxyBase<true>(position, value);
+	}
+	
+	operator Node<Const>() const {
+		return Node(
+			parent,
+			children,
+			leafs,
+			hasParent,
+			hasChildren,
+			depth,
+			position,
+			dimensions,
+			value);
+	}
+	
+};
+
+
+
 // TODO: this needs to be ripped out and remade.
 /**
  * \brief An iterator over the NodeRangeBase container.
@@ -919,60 +1072,65 @@ class Octree<L, N, Dim>::NodeIteratorBase final {
 private:
 	
 	friend Octree<L, N, Dim>;
+	
 	template<bool Const_>
 	friend class Octree<L, N, Dim>::NodeRangeBase;
 	
-	// These typedefs reference the underlying lists in the Octree class that
-	// actually store the nodes.
-	using Range = Octree<L, N, Dim>::NodeRangeBase<Const>;
-	using List = Octree<L, N, Dim>::NodeList;
+	using ReferenceProxy = NodeReferenceProxyBase<Const>;
 	using ListIterator = std::conditional_t<
 			Const,
-			typename List::const_iterator,
-			typename List::iterator>;
+			NodeList::const_iterator,
+			NodeList::iterator>;
 	using ListReference = std::conditional_t<
 			Const,
-			typename List::const_reference,
-			typename List::reference>;
-	
+			NodeList::const_reference,
+			NodeList::reference>;
 	using OctreePointer = std::conditional_t<
 			Const,
 			Octree<L, N, Dim> const*,
 			Octree<L, N, Dim>*>;
 	
-	OctreePointer _octree;
-	typename Range::difference_type _index;
+	struct PointerProxy {
+		
+		ReferenceProxy reference;
+		
+		PointerProxy(ReferenceProxy reference) :
+				reference(reference) {
+		}
+		
+		ReferenceProxy* operator->() const {
+			return &reference;
+		}
+		
+	};
 	
-	NodeIteratorBase(
-			OctreePointer octree,
-			typename Range::difference_type index) :
+	OctreePointer _octree;
+	List::difference_type _index;
+	
+	NodeIteratorBase(OctreePointer octree, List::difference_type index) :
 			_octree(octree),
 			_index(index) {
 	}
 	
-	// These methods provide convenient access to the underlying list.
-	ListReference listRef() const {
-		return _octree->_nodes[_index];
-	}
-	ListIterator listIt() const {
+	// Converts this iterator to an iterator over the internal node type.
+	ListIterator internalIt() const {
 		return _octree->_nodes.begin() + _index;
 	}
 	
 public:
 	
 	// Iterator typedefs.
-	using value_type = typename Range::value_type;
-	using reference = std::conditional_t<
-			Const,
-			typename Range::const_reference,
-			typename Range::reference>;
-	using pointer = std::conditional_t<
-			Const,
-			typename Range::const_pointer,
-			typename Range::pointer>;
-	using size_type = typename Range::size_type;
-	using difference_type = typename Range::difference_type;
-	using iterator_category = std::random_access_iterator_tag;
+	using value_type = Node;
+	using reference = ReferenceProxy;
+	using pointer = PointerProxy;
+	using size_type = List::size_type;
+	using difference_type = List::difference_type;
+	using iterator_category = std::input_iterator_tag;
+	
+	NodeIteratorBase() :
+			_octree(NULL),
+			_index(0) {
+	}
 	
 	operator NodeIteratorBase<true, Reverse>() const {
 		return NodeIteratorBase<true, Reverse>(_octree, _index);
@@ -988,172 +1146,41 @@ public:
 	 */
 	NodeIteratorBase<Const, !Reverse> reverse() const {
 		difference_type shift = !Reverse ? -1 : +1;
-		return NodeIteratorBase<Const, !Reverse>(
-			_octree,
-			_index + shift);
-	}
-	
-	/**
-	 * \brief Gets the "upper-left" corner of the node pointed to by this
-	 * iterator.
-	 */
-	Vector<Dim> const& position() const {
-		return listRef().position;
-	}
-	/**
-	 * \brief Gets the size of the node pointed to by this iterator.
-	 */
-	Vector<Dim> const& dimensions() const {
-		return listRef().dimensions;
-	}
-	/**
-	 * \brief Returns whether a certain point is contained within the node
-	 * pointed to by this iterator.
-	 */
-	bool contains(Vector<Dim> const& point) const {
-		for (std::size_t dim = 0; dim < Dim; ++dim) {
-			if (!(
-					point[dim] >= position()[dim] &&
-					point[dim] < position()[dim] + dimensions()[dim])) {
-				return false;
-			}
-		}
-		return true;
-	}
-	/**
-	 * \brief Returns whether a certain leaf is contained within the node
-	 * pointed to by this iterator.
-	 */
-	bool contains(Octree<L, N, Dim>::ConstLeafIterator leaf) const {
-		difference_type index = listRef().leafIndex;
-		difference_type count = listRef().leafCount;
-		return
-			leaf._index >= index &&
-			leaf._index < index + count;
-	}
-	/**
-	 * \brief Returns whether the node is able to hold a certain number of
-	 * additional leaves without being over capacity.
-	 */
-	bool canHoldLeafs(
-			typename Octree<L, N, Dim>::LeafRange::difference_type n) const {
-		return
-			listRef().leafCount + n <= _octree->_nodeCapacity ||
-			listRef().depth >= _octree->_maxDepth;
-	}
-	
-	/**
-	 * \brief Returns whether this node has a parent.
-	 * 
-	 * If this method returns false, then the node must be the root of the
-	 * Octree.
-	 */
-	bool hasParent() const {
-		return listRef().hasParent;
-	}
-	/**
-	 * \brief Gets an iterator pointing to the parent of this node.
-	 * 
-	 * If this node has no parent (that is, this node is the root node), then
-	 * the result is undefined.
-	 */
-	NodeIteratorBase<Const, Reverse> parent() const {
-		return NodeIteratorBase<Const, Reverse>(
-			_octree,
-			_index + listRef().parentIndex);
-	}
-	
-	/**
-	 * \brief Returns whether this node has any children.
-	 */
-	bool hasChildren() const {
-		return listRef().hasChildren;
-	}
-	/**
-	 * \brief Returns one of the children of this node by index.
-	 * 
-	 * By default, a node has either `2 ** Dim` or `0` children. If this node
-	 * has no children, then the result is undefined.
-	 * 
-	 * \param childIndex the index of the child to return
-	 */
-	NodeIteratorBase<Const, Reverse> child(
-			size_type childIndex) const {
-		return NodeIteratorBase<Const, Reverse>(
-			_octree,
-			_index + listRef().childIndices[childIndex]);
-	}
-	/**
-	 * \brief Returns one of the children of this node by position.
-	 * 
-	 * This method returns the child of this node that contains the given point.
-	 * If the point is outside of the bounds of the current node, then it is
-	 * automatically normalized to be within the bounds.
-	 * 
-	 * \param point the position contained by the child to return
-	 */
-	NodeIteratorBase<Const, Reverse> child(
-			Vector<Dim> point) const {
-		size_type childIndex = 0;
-		for (std::size_t dim = 0; dim < Dim; ++dim) {
-			if (point[dim] >= position()[dim] + dimensions()[dim] / 2.0) {
-				childIndex += (1 << dim);
-			}
-		}
-		return child(childIndex);
-	}
-	/**
-	 * \brief Returns one of the children of this node by the leaf that it
-	 * contains.
-	 * 
-	 * This method returns the child of this node that contains the given leaf.
-	 * If the leaf is not contained within the current node, then the result is
-	 * the past-the-end iterator of the Octree::nodes() container.
-	 * 
-	 * \param leaf an iterator to the leaf contained by the child to return
-	 */
-	NodeIteratorBase<Const, Reverse> child(
-			ConstLeafIterator leaf) const {
-		for (size_type childIndex = 0; childIndex < (1 << Dim); ++childIndex) {
-			NodeIteratorBase<Const, Reverse> child = this->child(childIndex);
-			if (child.contains(leaf)) {
-				return child;
-			}
-		}
-		return _octree->nodes().end();
-	}
-	
-	/**
-	 * \brief Returns a list of all of the descendants of this node, but not
-	 * including this node itself.
-	 */
-	NodeRangeBase<Const> children() const;
-	/**
-	 * \brief Returns a list containing this node as well as all of its
-	 * descendants.
-	 */
-	NodeRangeBase<Const> nodes() const;
-	/**
-	 * \brief Returns a list of all of the leaves contained within this node.
-	 */
-	LeafRangeBase<Const> leafs() const;
-	
-	/**
-	 * \brief Returns how many generations beneath the root that this node is.
-	 */
-	std::size_t depth() const {
-		return listRef().depth;
+		return NodeIteratorBase<Const, !Reverse>(_octree, _index + shift);
 	}
 	
 	// Iterator element access methods.
 	reference operator*() const {
-		return _octree->_nodes[_index].data;
+		NodeIteratorBase<Const, false> parent(
+			_octree,
+			_index + _octree->_nodes[_index].parentIndex);
+		NodeIteratorBase<Const, false> children[(1 << Dim) + 1];
+		for (
+				std::size_t childIndex = 0;
+				childIndex < (1 << Dim) + 1;
+				++childIndex) {
+			children[childIndex] = NodeIteratorBase<Const, false>(
+				_octree,
+				_index + _octree->_nodes[_index].childIndices[childIndex]);
+		}
+		LeafRangeBase<Const> leafs(
+			_octree,
+			_octree->_nodes[_index].leafIndex,
+			_octree->_nodes[_index].leafIndex +
+			_octree->_nodes[_index].leafCount);
+		return NodeReferenceProxyBase<Const>(
+			parent,
+			children,
+			leafs,
+			_octree->_nodes[_index].hasParent,
+			_octree->_nodes[_index].hasChildren,
+			_octree->_nodes[_index].depth,
+			_octree->_nodes[_index].position,
+			_octree->_nodes[_index].dimensions,
+			_octree->_nodes[_index].value);
 	}
 	pointer operator->() const {
-		return &_octree->_nodes[_index].data;
-	}
-	reference operator[](difference_type n) const {
-		return _octree->_nodes[_index + n].data;
+		return PointerProxy(operator*());
 	}
 	
 	// Iterator increment methods.
@@ -1179,72 +1206,16 @@ public:
 		return result;
 	}
 	
-	NodeIteratorBase<Const, Reverse>& operator+=(difference_type n) {
-		difference_type shift = Reverse ? -n : +n;
-		_index += shift;
-		return *this;
-	}
-	NodeIteratorBase<Const, Reverse>& operator-=(difference_type n) {
-		difference_type shift = Reverse ? +n : -n;
-		_index += shift;
-		return *this;
-	}
-	
-	// Iterator arithmetic methods.
-	friend NodeIteratorBase<Const, Reverse> operator+(
-			NodeIteratorBase<Const, Reverse> it,
-			difference_type n) {
-		it += n;
-		return it;
-	}
-	friend NodeIteratorBase<Const, Reverse> operator+(
-			difference_type n,
-			NodeIteratorBase<Const, Reverse> it) {
-		return it + n;
-	}
-	friend NodeIteratorBase<Const, Reverse> operator-(
-			NodeIteratorBase<Const, Reverse> it,
-			difference_type n) {
-		it -= n;
-		return it;
-	}
-	
-	friend difference_type operator-(
-			NodeIteratorBase<Const, Reverse> const& lhs,
-			NodeIteratorBase<Const, Reverse> const& rhs) {
-		return Reverse ? rhs._index - lhs._index : lhs._index - rhs._index;
-	}
-	
 	// Iterator comparison methods.
 	friend bool operator==(
 			NodeIteratorBase<Const, Reverse> const& lhs,
 			NodeIteratorBase<Const, Reverse> const& rhs) {
-		return lhs._index == rhs._index;
+		return lhs._octree == rhs._octree && lhs._index == rhs._index;
 	}
 	friend bool operator!=(
 			NodeIteratorBase<Const, Reverse> const& lhs,
 			NodeIteratorBase<Const, Reverse> const& rhs) {
 		return !(lhs == rhs);
-	}
-	friend bool operator<(
-			NodeIteratorBase<Const, Reverse> const& lhs,
-			NodeIteratorBase<Const, Reverse> const& rhs) {
-		return Reverse ? rhs._index < lhs._index : lhs._index < rhs._index;
-	}
-	friend bool operator>(
-			NodeIteratorBase<Const, Reverse> const& lhs,
-			NodeIteratorBase<Const, Reverse> const& rhs) {
-		return rhs < lhs;
-	}
-	friend bool operator<=(
-			NodeIteratorBase<Const, Reverse> const& lhs,
-			NodeIteratorBase<Const, Reverse> const& rhs) {
-		return !(lhs > rhs);
-	}
-	friend bool operator>=(
-			NodeIteratorBase<Const, Reverse> const& lhs,
-			NodeIteratorBase<Const, Reverse> const& rhs) {
-		return !(lhs < rhs);
 	}
 	
 };

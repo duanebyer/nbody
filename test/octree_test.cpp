@@ -338,18 +338,18 @@ CheckOctreeResult checkOctree(
 	leafPairStack.push_back(allLeafPairs);
 	
 	// Check that the root node has no parent.
-	if (octree.nodes().begin().hasParent()) {
+	if (octree.root()->hasParent) {
 		return CheckOctreeResult::RootHasParent;
 	}
 	
 	// Loop through all of the nodes.
 	for (
-			auto node = octree.nodes().begin();
+			auto node = octree.root();
 			node != octree.nodes().end();
 			++node) {
 		// Check that the current node has depth of +1 from its parent.
-		if (node.depth() !=
-				(node.hasParent() ? node.parent().depth() + 1 : 0)) {
+		if (node->depth !=
+				(node->hasParent ? node->parent->depth + 1 : 0)) {
 			return CheckOctreeResult::DepthIncorrect;
 		}
 		
@@ -358,42 +358,42 @@ CheckOctreeResult checkOctree(
 		std::vector<LeafPair<Dim> > leafPairs(leafPairStack.back());
 		leafPairStack.pop_back();
 		
-		if (leafPairs.size() > node.leafs().size()) {
+		if (leafPairs.size() > node->leafs.size()) {
 			return CheckOctreeResult::LeafDuplicate;
 		}
-		if (leafPairs.size() < node.leafs().size()) {
+		if (leafPairs.size() < node->leafs.size()) {
 			return CheckOctreeResult::LeafMissing;
 		}
 		
 		for (auto leafPair : leafPairs) {
 			auto leaf = std::find(
-				node.leafs().begin(),
-				node.leafs().end(),
+				node->leafs.begin(),
+				node->leafs.end(),
 				std::get<Leaf>(leafPair));
 			if (leaf == node.leafs().end()) {
 				return CheckOctreeResult::LeafMissing;
 			}
-			if (leaf.position() != std::get<Vector<Dim> >(leafPair)) {
+			if (leaf->position != std::get<Vector<Dim> >(leafPair)) {
 				return CheckOctreeResult::LeafPositionMismatch;
 			}
 			for (std::size_t dim = 0; dim < Dim; ++dim) {
-				Scalar lower = node.position()[dim];
-				Scalar upper = lower + node.dimensions()[dim];
+				Scalar lower = node->position[dim];
+				Scalar upper = lower + node->dimensions[dim];
 				if (!(
-						leaf.position()[dim] >= lower &&
-						leaf.position()[dim] < upper)) {
+						leaf->position[dim] >= lower &&
+						leaf->position[dim] < upper)) {
 					return CheckOctreeResult::LeafOutOfBounds;
 				}
 			}
 		}
 		
-		if (!node.hasChildren()) {
+		if (!node->hasChildren) {
 			int depthSign =
-				(node.depth() > octree.maxDepth()) -
-				(node.depth() < octree.maxDepth());
+				(node->depth > octree->maxDepth) -
+				(node->depth < octree->maxDepth);
 			// If the node doesn't have children, then make sure that it doesn't
 			// have too many leafs and that it isn't too deep.
-			if (depthSign < 0 && node.leafs().size() > octree.nodeCapacity()) {
+			if (depthSign < 0 && node->leafs.size() > octree.nodeCapacity()) {
 				return CheckOctreeResult::NodeOverCapacity;
 			}
 			if (depthSign > 0) {
@@ -402,17 +402,17 @@ CheckOctreeResult checkOctree(
 		}
 		else {
 			// Otherwise, make sure it doens't have too few leafs either.
-			if (node.leafs().size() <= octree.nodeCapacity()) {
+			if (node->leafs.size() <= octree.nodeCapacity()) {
 				return CheckOctreeResult::NodeUnderCapacity;
 			}
 			// Iterate over every child, and add its leafs to the stack (in
 			// reverse order so that the children are added to the stack in
 			// order).
 			for (std::size_t childIndex = (1 << Dim); childIndex-- > 0; ) {
-				auto child = node.child(childIndex);
+				auto child = node->children[childIndex];
 				
 				// Check that the child's parent is this node.
-				if (child.parent() != node) {
+				if (child->parent != node) {
 					return CheckOctreeResult::ChildParentMismatch;
 				}
 				// Create a vector to store the leaf-position pairs that belong
@@ -425,8 +425,8 @@ CheckOctreeResult checkOctree(
 					leafPairs.begin(),
 					leafPairs.end(),
 					[child](LeafPair<Dim> leafPair) {
-						auto begin = child.leafs().begin();
-						auto end = child.leafs().end();
+						auto begin = child->leafs.begin();
+						auto end = child->leafs.end();
 						return std::find(
 							begin,
 							end,
@@ -439,7 +439,7 @@ CheckOctreeResult checkOctree(
 				leafPairs.erase(leafPairs.begin(), lastChildLeaf);
 				
 				// Put the child leaf pairs onto the stack.
-				if (childLeafPairs.size() != child.leafs().size()) {
+				if (childLeafPairs.size() != child->leafs.size()) {
 					return CheckOctreeResult::LeafNotInParent;
 				}
 				leafPairStack.push_back(childLeafPairs);
@@ -497,10 +497,10 @@ std::string to_string(TestOctree<Dim> octree) {
 	os << "node capacity: " << octree.nodeCapacity() << ", ";
 	os << "max depth: " << octree.maxDepth() << ", ";
 	os << "position: ";
-	os << to_string(octree.nodes().begin().position());
+	os << to_string(octree.root().position());
 	os << ", ";
 	os << "dimensions: ";
-	os << to_string(octree.nodes().begin().dimensions());
+	os << to_string(octree.root().dimensions());
 	os << ")";
 	return os.str();
 }
