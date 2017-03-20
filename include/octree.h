@@ -69,15 +69,44 @@ public:
 	template<bool Const>
 	struct NodeReferenceProxyBase;
 	
+	///@{
+	/**
+	 * \brief Provides access to a node of the Octree.
+	 * 
+	 * These types are `const` and non-`const` specializations of the NodeBase
+	 * class, since NodeBase allows for traversal of the Octree through
+	 * iterators. Otherwise, it might be possible to obtain a non-`const`
+	 * reference from a `const` iterator.
+	 */
 	using Node = NodeBase<false>;
 	using ConstNode = NodeBase<true>;
+	///@}
 	
-	// TODO: Doxygen comment here
+	///@{
+	/**
+	 * \brief Proxy type that acts as a reference to a Leaf.
+	 * 
+	 * This type is able to mimic the behaviour of the `Leaf&` type in most
+	 * cases. However, pointers to this type do not behave correctly. For
+	 * example, the expression `&leafReferenceProxyInstance` does not work as
+	 * expected.
+	 */
 	using LeafReferenceProxy = LeafReferenceProxyBase<false>;
 	using ConstLeafReferenceProxy = LeafReferenceProxyBase<true>;
+	///@}
 	
+	///@{
+	/**
+	 * \brief Proxy type that acts as a reference to a Node.
+	 * 
+	 * This type is able to mimic the behaviour of the `Node&` type in most
+	 * cases. However, pointers to this type do not behave correctly. For
+	 * example, the expression `&nodeReferenceProxyInstance` does not work as
+	 * expected.
+	 */
 	using NodeReferenceProxy = NodeReferenceProxyBase<false>;
 	using ConstNodeReferenceProxy = NodeReferenceProxyBase<true>;
+	///@}
 	
 	// These classes are used to construct const-variants and reverse-variants
 	// of the public range and iterator classes.
@@ -321,15 +350,23 @@ public:
 	ConstNodeRange cnodes() const;
 	///@}
 	
-	// TODO: doxygen comment
+	///@{
+	/**
+	 * \brief Gets an iterator to the root node of the Octree.
+	 */
 	NodeIterator root();
 	ConstNodeIterator root() const;
 	ConstNodeRange croot() const;
+	///@}
 	
-	// TODO: doxygen comment
+	///@{
+	/**
+	 * \brief Gets a range that contains all descendants of a specific node.
+	 */
 	NodeRange descendants(NodeIterator node);
 	ConstNodeRange descendants(ConstNodeIterator node) const;
 	ConstNodeRange cdescendants(ConstNodeIterator node) const;
+	///@}
 	
 	///@{
 	/**
@@ -474,22 +511,22 @@ public:
 	 */
 	NodeIterator find(
 			ConstNodeIterator hint,
-			Vector<Dim> const& position);
+			Vector<Dim> const& point);
 	
 	NodeIterator find(
 			Vector<Dim> const& position) {
-		return find(nodes().begin(), position);
+		return find(nodes().begin(), point);
 	}
 	
 	ConstNodeIterator find(
 			ConstNodeIterator start,
-			Vector<Dim> const& position) const {
-		return const_cast<Octree<L, N, Dim>*>(this)->find(start, position);
+			Vector<Dim> const& point) const {
+		return const_cast<Octree<L, N, Dim>*>(this)->find(start, point);
 	}
 	
 	ConstNodeIterator find(
-			Vector<Dim> const& position) const {
-		return find(nodes().begin(), position);
+			Vector<Dim> const& point) const {
+		return find(nodes().begin(), point);
 	}
 	///@}
 	
@@ -528,7 +565,21 @@ public:
 	}
 	///@}
 	
-	// TODO: add doxygen comment
+	///@{
+	/**
+	 * \brief Searches a node for one of its children that contains a certain
+	 * position.
+	 * 
+	 * This method divides all of space into the octants of the node. Even if
+	 * the position is not technically contained by one of the children, the
+	 * child that would contain the position if it was extended to infinity will
+	 * returned.
+	 * 
+	 * If the node has no children, then the result is undefined.
+	 * 
+	 * \param node the parent of the children that will be searched
+	 * \param position the position to search for
+	 */
 	NodeIterator findChild(
 			ConstNodeIterator node,
 			Vector<Dim> const& point);
@@ -537,8 +588,18 @@ public:
 			Vector<Dim> const& point) const {
 		return const_cast<Octree<L, N, Dim>*>(this)->findChild(node, point);
 	}
+	///@}
 	
-	// TODO: add doxygen comment
+	///@{
+	/**
+	 * \brief Searches a node for one of its children that contains a certain
+	 * leaf.
+	 * 
+	 * If the node has no children, then the result is undefined.
+	 * 
+	 * \param node the parent of the children that will be searched
+	 * \param leaf the leaf to search for
+	 */
 	NodeIterator findChild(
 			ConstNodeIterator node,
 			ConstLeafIterator leaf);
@@ -547,9 +608,12 @@ public:
 			ConstLeafIterator leaf) {
 		return const_cast<Octree<L, N, Dim>*>(this)->findChild(node, leaf);
 	}
+	///@}
 	
-	// TODO: add Doxygen comment here
-	bool contains(ConstNodeIterator node, Vector<Dim> const& point) const {
+	/**
+	 * \brief Determines whether a node contains a point.
+	 */
+	bool contains(ConstNodeIterator node, Vector<Dim> const& position) const {
 		for (std::size_t dim = 0; dim < Dim; ++dim) {
 			if (!(
 					point[dim] >= node->position[dim] &&
@@ -560,7 +624,9 @@ public:
 		return true;
 	}
 	
-	// TODO: add Doxygen comment here
+	/**
+	 * \brief Determines whether a node contains a leaf.
+	 */
 	bool contains(ConstNodeIterator node, ConstLeafIterator leaf) const {
 		LeafList::difference_type index = node.internalIt()->leafIndex;
 		LeafList::size_type count = node.internalIt()->leafCount;
@@ -1035,8 +1101,8 @@ public:
 		return NodeReferenceProxyBase<true>(position, value);
 	}
 	
-	operator Node<Const>() const {
-		return Node(
+	operator NodeBase<Const>() const {
+		return NodeBase<Const>(
 			parent,
 			children,
 			leafs,

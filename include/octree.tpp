@@ -468,8 +468,8 @@ Octree<L, N, Dim>::move(
 template<typename L, typename N, std::size_t Dim>
 typename Octree<L, N, Dim>::NodeIterator Octree<L, N, Dim>::find(
 		ConstNodeIterator hint,
-		Vector<Dim> const& position) {
-	bool contains = hint.contains(position);
+		Vector<Dim> const& point) {
+	bool contains = hint.contains(point);
 	// If this node is childless and contains the point, then just return it.
 	if (contains && !hint->hasChildren) {
 		return NodeIterator(this, hint._index);
@@ -477,12 +477,12 @@ typename Octree<L, N, Dim>::NodeIterator Octree<L, N, Dim>::find(
 	// If it is childless but contains the point, then recursively call this
 	// method on the child that also conains the point.
 	else if (contains && hint->hasChildren) {
-		return find(findChild(hint, position), position);
+		return find(findChild(hint, point), point);
 	}
 	// If it does not contain the point, then recursively call this method on
 	// the parent of this node.
 	else if (hint->hasParent) {
-		return find(hint->parent, position);
+		return find(hint->parent, point);
 	}
 	return nodes().end();
 }
