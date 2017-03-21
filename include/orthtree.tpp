@@ -18,8 +18,8 @@ template<typename L, typename N, std::size_t Dim>
 Orthtree<L, N, Dim>::Orthtree(
 		Vector<Dim> position,
 		Vector<Dim> dimensions,
-		LeafList::size_type nodeCapacity,
-		NodeList::size_type maxDepth,
+		typename LeafList::size_type nodeCapacity,
+		typename NodeList::size_type maxDepth,
 		bool adjust) :
 		_leafs(),
 		_nodes(),
@@ -70,7 +70,8 @@ typename Orthtree<L, N, Dim>::NodeIterator Orthtree<L, N, Dim>::createChildren(
 	// node and update their child indices.
 	NodeIterator parent = node;
 	while (parent.hasParent()) {
-		NodeList::size_type siblingIndex = parent.internalIt()->siblingIndex;
+		typename NodeList::size_type siblingIndex;
+		siblingIndex = parent.internalIt()->siblingIndex;
 		parent = parent.parent();
 		while (++siblingIndex < (1 << Dim)) {
 			parent.internalIt()->childIndices[siblingIndex] += (1 << Dim);
@@ -81,9 +82,12 @@ typename Orthtree<L, N, Dim>::NodeIterator Orthtree<L, N, Dim>::createChildren(
 	}
 	
 	// Distribute the leaves of this node to the children.
-	for (LeafList::size_type index = 0; index < node.leafs().size(); ++index) {
+	for (
+			typename LeafList::size_type index = 0;
+			index < node.leafs().size();
+			++index) {
 		// Figure out which node the leaf belongs to.
-		NodeList::size_type childIndex = 0;
+		typename NodeList::size_type childIndex = 0;
 		LeafIterator leaf = node.leafs().begin();
 		Vector<Dim> const& position = leaf.position();
 		for (std::size_t dim = 0; dim < Dim; ++dim) {
@@ -102,7 +106,7 @@ typename Orthtree<L, N, Dim>::NodeIterator Orthtree<L, N, Dim>::destroyChildren(
 		NodeIterator node) {
 	// Determine how many children, grandchildren, great-grandchildren, ...
 	// of this node.
-	NodeList::size_type numDescendants = descendants(node).size();
+	typename NodeList::size_type numDescendants = descendants(node).size();
 	
 	// Destroy the subnodes. This won't invalidate the node iterator.
 	_nodes.erase(
@@ -114,7 +118,8 @@ typename Orthtree<L, N, Dim>::NodeIterator Orthtree<L, N, Dim>::destroyChildren(
 	// node and update their child indices.
 	NodeIterator parent = node;
 	while (parent->hasParent) {
-		NodeList::size_type siblingIndex = parent.internalIt()->siblingIndex;
+		typename NodeList::size_type siblingIndex;
+		siblingIndex = parent.internalIt()->siblingIndex;
 		parent = parent->parent;
 		while (++siblingIndex < (1 << Dim)) {
 			parent.internalIt()->childIndices[siblingIndex] -= numDescendants;
@@ -283,7 +288,7 @@ Orthtree<L, N, Dim>::croot() const {
 template<typename L, typename N, std::size_t Dim>
 typename Orthtree<L, N, Dim>::NodeRange
 Orthtree<L, N, Dim>::descendants(
-		NodeIterator node) {
+		ConstNodeIterator node) {
 	return NodeRange(
 		this,
 		node->children[0]._index,
@@ -292,8 +297,8 @@ Orthtree<L, N, Dim>::descendants(
 
 template<typename L, typename N, std::size_t Dim>
 typename Orthtree<L, N, Dim>::ConstNodeRange
-Octree<L, N, Dim>::descendants(
-		ConstNodeIterator node) {
+Orthtree<L, N, Dim>::descendants(
+		ConstNodeIterator node) const {
 	return ConstNodeRange(
 		this,
 		node->children[0]._index,
@@ -302,7 +307,7 @@ Octree<L, N, Dim>::descendants(
 
 template<typename L, typename N, std::size_t Dim>
 typename Orthtree<L, N, Dim>::ConstNodeRange
-Octree<L, N, Dim>::descendants(
+Orthtree<L, N, Dim>::cdescendants(
 		ConstNodeIterator node) const {
 	return ConstNodeRange(
 		this,
@@ -341,7 +346,7 @@ std::tuple<
 		typename Orthtree<L, N, Dim>::LeafIterator>
 Orthtree<L, N, Dim>::insert(
 		ConstNodeIterator hint,
-		L const& data,
+		L const& value,
 		Vector<Dim> const& position) {
 	// Find the node with the correct position, and insert the leaf into
 	// that node.
@@ -363,9 +368,9 @@ std::tuple<
 		typename Orthtree<L, N, Dim>::NodeIterator,
 		typename Orthtree<L, N, Dim>::LeafIterator>
 Orthtree<L, N, Dim>::insert(
-		L const& data,
+		L const& value,
 		Vector<Dim> const& position) {
-	return insert(root(), data, position);
+	return insert(root(), value, position);
 }
 
 template<typename L, typename N, std::size_t Dim>
@@ -525,7 +530,7 @@ template<typename L, typename N, std::size_t Dim>
 typename Orthtree<L, N, Dim>::NodeIterator Orthtree<L, N, Dim>::findChild(
 		ConstNodeIterator node,
 		Vector<Dim> const& point) {
-	NodeList::size_type childIndex = 0;
+	typename NodeList::size_type childIndex = 0;
 	for (std::size_t dim = 0; dim < Dim; ++dim) {
 		if (point[dim] >= node->position[dim] + node->dimensions[dim] / 2.0) {
 			childIndex += (1 << dim);
@@ -540,7 +545,7 @@ typename Orthtree<L, N, Dim>::NodeIterator Orthtree<L, N, Dim>::findChild(
 		ConstNodeIterator node,
 		ConstLeafIterator leaf) {
 	for (
-			NodeList::size_type childIndex = 0;
+			typename NodeList::size_type childIndex = 0;
 			childIndex < (1 << Dim);
 			++childIndex) {
 		ConstNodeIterator child = node->children[childIndex];

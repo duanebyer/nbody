@@ -21,7 +21,8 @@ using namespace nbody;
 struct LeafValue;
 struct NodeValue;
 
-using LeafPair = std::tuple<LeafValue, Vector<3> >;
+using Point = Vector<3>;
+using LeafPair = std::tuple<LeafValue, Point>;
 using Octree = Orthtree<LeafValue, NodeValue, 3>;
 
 struct LeafValue {
@@ -96,13 +97,13 @@ struct print_log_value<LeafValue> {
 		os << to_string(leafValue);
 	}
 };
-template<std::size_t Dim>
+template<>
 struct print_log_value<LeafPair> {
 	void operator()(std::ostream& os, LeafPair const& pair) {
 		os << to_string(pair);
 	}
 };
-template<std::size_t Dim>
+template<>
 struct print_log_value<Octree> {
 	void operator()(std::ostream& os, Octree const& octree) {
 		os << to_string(octree);
@@ -150,56 +151,56 @@ static auto const leafPairsData = bdata::make(
 	std::vector<std::vector<LeafPair> > {
 		// Shallow octree with a single point in each octant.
 		std::vector<LeafPair> {
-			LeafPair {Leaf(0), {4,  4,  4}},
-			LeafPair {Leaf(1), {12, 4,  4}},
-			LeafPair {Leaf(2), {4,  12, 4}},
-			LeafPair {Leaf(3), {12, 12, 4}},
-			LeafPair {Leaf(4), {4,  4,  12}},
-			LeafPair {Leaf(5), {12, 4,  12}},
-			LeafPair {Leaf(6), {4,  12, 12}},
-			LeafPair {Leaf(7), {12, 12, 12}},
+			LeafPair {LeafValue(0), {4,  4,  4}},
+			LeafPair {LeafValue(1), {12, 4,  4}},
+			LeafPair {LeafValue(2), {4,  12, 4}},
+			LeafPair {LeafValue(3), {12, 12, 4}},
+			LeafPair {LeafValue(4), {4,  4,  12}},
+			LeafPair {LeafValue(5), {12, 4,  12}},
+			LeafPair {LeafValue(6), {4,  12, 12}},
+			LeafPair {LeafValue(7), {12, 12, 12}},
 		},
 		// Deep octree with many leafs at the same point.
 		std::vector<LeafPair> {
-			LeafPair {Leaf(0), {13, 13, 13}},
-			LeafPair {Leaf(1), {13, 13, 13}},
-			LeafPair {Leaf(2), {13, 13, 13}},
-			LeafPair {Leaf(3), {13, 13, 13}},
+			LeafPair {LeafValue(0), {13, 13, 13}},
+			LeafPair {LeafValue(1), {13, 13, 13}},
+			LeafPair {LeafValue(2), {13, 13, 13}},
+			LeafPair {LeafValue(3), {13, 13, 13}},
 		},
 		// Complex quadtree with points in many various locations.
 		std::vector<LeafPair> {
-			LeafPair {Leaf(0),  {1,  2,  1}},
-			LeafPair {Leaf(1),  {6,  2,  1}},
-			LeafPair {Leaf(2),  {6,  6,  1}},
-			LeafPair {Leaf(3),  {3,  2,  1}},
-			LeafPair {Leaf(4),  {2,  6,  1}},
-			LeafPair {Leaf(5),  {14, 6,  1}},
-			LeafPair {Leaf(6),  {6,  14, 1}},
-			LeafPair {Leaf(7),  {6,  10, 1}},
-			LeafPair {Leaf(8),  {2,  10, 1}},
-			LeafPair {Leaf(9),  {2,  14, 1}},
+			LeafPair {LeafValue(0),  {1,  2,  1}},
+			LeafPair {LeafValue(1),  {6,  2,  1}},
+			LeafPair {LeafValue(2),  {6,  6,  1}},
+			LeafPair {LeafValue(3),  {3,  2,  1}},
+			LeafPair {LeafValue(4),  {2,  6,  1}},
+			LeafPair {LeafValue(5),  {14, 6,  1}},
+			LeafPair {LeafValue(6),  {6,  14, 1}},
+			LeafPair {LeafValue(7),  {6,  10, 1}},
+			LeafPair {LeafValue(8),  {2,  10, 1}},
+			LeafPair {LeafValue(9),  {2,  14, 1}},
 			
-			LeafPair {Leaf(10), {10, 6,  1}},
-			LeafPair {Leaf(11), {10, 2,  1}},
-			LeafPair {Leaf(12), {9,  9,  1}},
-			LeafPair {Leaf(13), {15, 1,  1}},
-			LeafPair {Leaf(14), {13, 3,  1}},
-			LeafPair {Leaf(15), {15, 3,  1}},
-			LeafPair {Leaf(16), {13, 1,  1}},
-			LeafPair {Leaf(17), {11, 9,  1}},
-			LeafPair {Leaf(18), {9,  11, 1}},
-			LeafPair {Leaf(19), {11, 11, 1}},
+			LeafPair {LeafValue(10), {10, 6,  1}},
+			LeafPair {LeafValue(11), {10, 2,  1}},
+			LeafPair {LeafValue(12), {9,  9,  1}},
+			LeafPair {LeafValue(13), {15, 1,  1}},
+			LeafPair {LeafValue(14), {13, 3,  1}},
+			LeafPair {LeafValue(15), {15, 3,  1}},
+			LeafPair {LeafValue(16), {13, 1,  1}},
+			LeafPair {LeafValue(17), {11, 9,  1}},
+			LeafPair {LeafValue(18), {9,  11, 1}},
+			LeafPair {LeafValue(19), {11, 11, 1}},
 			
-			LeafPair {Leaf(20), {15, 9,  1}},
-			LeafPair {Leaf(21), {15, 13, 1}},
-			LeafPair {Leaf(22), {15, 11, 1}},
-			LeafPair {Leaf(23), {15, 15, 1}},
-			LeafPair {Leaf(24), {13, 9,  1}},
-			LeafPair {Leaf(25), {13, 13, 1}},
-			LeafPair {Leaf(26), {11, 13, 1}},
-			LeafPair {Leaf(27), {9,  13, 1}},
-			LeafPair {Leaf(28), {11, 15, 1}},
-			LeafPair {Leaf(29), {9,  15, 1}},
+			LeafPair {LeafValue(20), {15, 9,  1}},
+			LeafPair {LeafValue(21), {15, 13, 1}},
+			LeafPair {LeafValue(22), {15, 11, 1}},
+			LeafPair {LeafValue(23), {15, 15, 1}},
+			LeafPair {LeafValue(24), {13, 9,  1}},
+			LeafPair {LeafValue(25), {13, 13, 1}},
+			LeafPair {LeafValue(26), {11, 13, 1}},
+			LeafPair {LeafValue(27), {9,  13, 1}},
+			LeafPair {LeafValue(28), {11, 15, 1}},
+			LeafPair {LeafValue(29), {9,  15, 1}},
 		},
 	}
 );
@@ -211,7 +212,7 @@ static auto const singleLeafPairData = bdata::make([]() {
 	for (Scalar x = 0.0; x <= 16.0; x += 1.0) {
 		for (Scalar y = 0.0; y <= 16.0; y += 1.0) {
 			for (Scalar z = 0.0; z <= 16.0; z += 1.0) {
-				result.push_back(LeafPair {Leaf(index), {x, y, z}});
+				result.push_back(LeafPair {LeafValue(index), {x, y, z}});
 			}
 		}
 	}
@@ -219,9 +220,9 @@ static auto const singleLeafPairData = bdata::make([]() {
 }());
 
 static auto const singleLeafData = bdata::make([]() {
-	std::vector<Leaf> result;
+	std::vector<LeafValue> result;
 	for (int data = -1; data < 30; ++data) {
-		result.push_back(Leaf(data));
+		result.push_back(LeafValue(data));
 	}
 	return result; 
 }());
@@ -235,7 +236,7 @@ BOOST_DATA_TEST_CASE(
 	// Insert the points in one at a time, and check that the orthtree is valid in
 	// between each insertion.
 	Octree octree = emptyOctree;
-	std::vector<LeafPair<3> > addedLeafPairs;
+	std::vector<LeafPair> addedLeafPairs;
 	for (auto it = leafPairs.begin(); it != leafPairs.end(); ++it) {
 		BOOST_TEST_CHECKPOINT("preparing to add " + to_string(*it));
 		addedLeafPairs.push_back(*it);
@@ -249,7 +250,7 @@ BOOST_DATA_TEST_CASE(
 template<typename LeafPair, typename L, typename N, std::size_t Dim>
 bool compareLeafPair(
 		LeafPair pair,
-		Orthtree<L, N, Dim>::ConstLeafReferenceProxy leaf) {
+		typename Orthtree<L, N, Dim>::ConstLeafReferenceProxy leaf) {
 	return
 		leaf.position == std::get<Vector<Dim> >(pair) &&
 		leaf.value == std::get<L>(pair);
@@ -351,7 +352,7 @@ CheckOrthtreeResult checkOrthtree(
 				auto lastChildLeaf = std::partition(
 					leafPairs.begin(),
 					leafPairs.end(),
-					[child](LeafPair<Dim> leafPair) {
+					[child](LeafPair leafPair) {
 						return child->leafs.end() != std::find(
 							child->leafs.begin(),
 							child->leafs.end(),
@@ -402,28 +403,28 @@ std::string to_string(Vector<Dim> const& vector) {
 
 std::string to_string(LeafValue const& leaf) {
 	std::ostringstream os;
-	os << "Leaf(" << leaf.data << ")";
+	os << "LeafValue(" << leaf.data << ")";
 	return os.str();
 }
 
 std::string to_string(LeafPair const& pair) {
 	std::ostringstream os;
 	os << "(";
-	os << to_string(std::get<Leaf>(pair)) << ", ";
-	os << to_string(std::get<Vector<Dim> >(pair)) << ")";
+	os << to_string(std::get<LeafValue>(pair)) << ", ";
+	os << to_string(std::get<Point>(pair)) << ")";
 	return os.str();
 }
 
-std::string to_string(Octree octree) {
+std::string to_string(Octree const& octree) {
 	std::ostringstream os;
 	os << "Octree(";
 	os << "node capacity: " << octree.nodeCapacity() << ", ";
 	os << "max depth: " << octree.maxDepth() << ", ";
 	os << "position: ";
-	os << to_string(octree.root().position());
+	os << to_string(octree.root()->position);
 	os << ", ";
 	os << "dimensions: ";
-	os << to_string(octree.root().dimensions());
+	os << to_string(octree.root()->dimensions);
 	os << ")";
 	return os.str();
 }
