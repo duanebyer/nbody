@@ -334,8 +334,8 @@ CheckOctreeResult checkOctree(
 		TestOctree<Dim> const& octree,
 		std::vector<LeafPair<Dim> > allLeafPairs) {
 	// Create a stack storing the points that belong to the current node.
-	std::vector<std::vector<LeafPair<Dim> > > leafPairStack;
-	leafPairStack.push_back(allLeafPairs);
+	std::vector<std::vector<LeafPair<Dim> > > leafPairsStack;
+	leafPairsStack.push_back(allLeafPairs);
 	
 	// Check that the root node has no parent.
 	if (octree.root()->hasParent) {
@@ -348,15 +348,14 @@ CheckOctreeResult checkOctree(
 			node != octree.nodes().end();
 			++node) {
 		// Check that the current node has depth of +1 from its parent.
-		if (node->depth !=
-				(node->hasParent ? node->parent->depth + 1 : 0)) {
+		if (node->depth != (node->hasParent ? node->parent->depth + 1 : 0)) {
 			return CheckOctreeResult::DepthIncorrect;
 		}
 		
 		// Take the top of the stack, and check whether each of the
 		// leaf-position pairs are within the dimensions.
-		std::vector<LeafPair<Dim> > leafPairs(leafPairStack.back());
-		leafPairStack.pop_back();
+		std::vector<LeafPair<Dim> > leafPairs(leafPairsStack.back());
+		leafPairsStack.pop_back();
 		
 		if (leafPairs.size() > node->leafs.size()) {
 			return CheckOctreeResult::LeafDuplicate;
@@ -442,7 +441,7 @@ CheckOctreeResult checkOctree(
 				if (childLeafPairs.size() != child->leafs.size()) {
 					return CheckOctreeResult::LeafNotInParent;
 				}
-				leafPairStack.push_back(childLeafPairs);
+				leafPairsStack.push_back(childLeafPairs);
 			}
 			// Check that each of the leaf-position pairs belonged to at least
 			// one of the children.
@@ -454,7 +453,7 @@ CheckOctreeResult checkOctree(
 	
 	// The stack should be empty, except if one of the nodes didn't have the
 	// right number of children.
-	if (!leafPairStack.empty()) {
+	if (!leafPairsStack.empty()) {
 		return CheckOctreeResult::ChildCountMismatch;
 	}
 	
