@@ -1,4 +1,4 @@
-#define BOOST_TEST_MODULE OctreeTest
+#define BOOST_TEST_MODULE OrthtreeTest
 
 #include <boost/test/unit_test.hpp>
 #include <boost/test/data/test_case.hpp>
@@ -136,14 +136,14 @@ struct print_log_value<std::vector<T> > {
 
 // A collection of different octrees with various parameters.
 static auto const octreeData =
-	bdata::make(TestOctree({0.0, 0.0, 0.0}, {16.0, 16.0, 16.0}, 3, 4)) +
-	bdata::make(TestOctree({0.0, 0.0, 0.0}, {16.0, 16.0, 16.0}, 3, 0)) +
-	bdata::make(TestOctree({0.0, 0.0, 0.0}, {16.0, 16.0, 16.0}, 3, 1)) +
-	bdata::make(TestOctree({0.0, 0.0, 0.0}, {16.0, 16.0, 16.0}, 3, 64)) +
-	bdata::make(TestOctree({0.0, 0.0, 0.0}, {16.0, 16.0, 16.0}, 1, 64)) +
-	bdata::make(TestOctree({0.0, 0.0, 0.0}, {16.0, 16.0, 16.0}, 64, 4)) +
-	bdata::make(TestOctree({0.0, 0.0, 0.0}, {16.0, 16.0, 16.0}, 64, 0)) +
-	bdata::make(TestOctree({-48.0, -32.0, 8.0}, {+64.0, +128.0, 4.0}, 3, 4));
+	bdata::make(Octree({0.0, 0.0, 0.0}, {16.0, 16.0, 16.0}, 3, 4)) +
+	bdata::make(Octree({0.0, 0.0, 0.0}, {16.0, 16.0, 16.0}, 3, 0)) +
+	bdata::make(Octree({0.0, 0.0, 0.0}, {16.0, 16.0, 16.0}, 3, 1)) +
+	bdata::make(Octree({0.0, 0.0, 0.0}, {16.0, 16.0, 16.0}, 3, 64)) +
+	bdata::make(Octree({0.0, 0.0, 0.0}, {16.0, 16.0, 16.0}, 1, 64)) +
+	bdata::make(Octree({0.0, 0.0, 0.0}, {16.0, 16.0, 16.0}, 64, 4)) +
+	bdata::make(Octree({0.0, 0.0, 0.0}, {16.0, 16.0, 16.0}, 64, 0)) +
+	bdata::make(Octree({-48.0, -32.0, 8.0}, {+64.0, +128.0, 4.0}, 3, 4));
 
 // A set of leaf pair lists that can be used to construct octrees.
 static auto const leafPairsData = bdata::make(
@@ -226,13 +226,13 @@ static auto const singleLeafData = bdata::make([]() {
 	return result; 
 }());
 
-// Constructs an empty octree, and then inserts a number of points into it.
+// Constructs an empty orthtree, and then inserts a number of points into it.
 BOOST_DATA_TEST_CASE(
-		OctreeFillTest,
+		OrthtreeFillTest,
 		octreeData * leafPairsData,
 		emptyOctree,
 		leafPairs) {
-	// Insert the points in one at a time, and check that the octree is valid in
+	// Insert the points in one at a time, and check that the orthtree is valid in
 	// between each insertion.
 	Octree octree = emptyOctree;
 	std::vector<LeafPair<3> > addedLeafPairs;
@@ -245,76 +245,6 @@ BOOST_DATA_TEST_CASE(
 		BOOST_REQUIRE_EQUAL(check, CheckOrthtreeResult::Success);
 	}
 }
-/*
-// Adds a single point to an octree.
-BOOST_DATA_TEST_CASE(
-		OctreeInsertTest,
-		octreeData * leafPairsData * singleLeafPairData,
-		octree,
-		leafPairs,
-		leafPair) {
-	for (auto it = leafPairs.begin(); it != leafPairs.end(); ++it) {
-		octree.insert(*it);
-	}
-	
-	CheckOrthtreeResult check = checkOctree(octree, leafPairs);
-	BOOST_REQUIRE_MESSAGE(
-		check == CheckOrthtreeResult::Success,
-		"failed to construct valid octree: " +
-		checkOctreeString(check));
-	
-	octree.insert(leafPair);
-	leafPairs.push_back(leafPair);
-	
-	BOOST_REQUIRE_MESSAGE(
-		check == CheckOrthtreeResult::Success,
-		"failed when adding leaf to octree: " +
-		checkOctreeString(check));
-}
-
-// Removes a single point from an octree.
-BOOST_DATA_TEST_CASE(
-		OctreeEraseTest,
-		octreeData * leafPairsData * singleLeafPairData,
-		octree,
-		leafPairs,
-		leaf) {
-	for (auto it = leafPairs.begin(); it != leafPairs.end(); ++it) {
-		octree.insert(*it);
-	}
-	
-	CheckOrthtreeResult check = checkOctree(octree, leafPairs);
-	BOOST_REQUIRE_MESSAGE(
-		check == CheckOrthtreeResult::Success,
-		"failed to construct valid octree: " +
-		checkOctreeString(check));
-	
-	auto octreeIt = std::find(
-		octree.leafs().begin(),
-		octree.leafs().end(),
-		leaf);
-	auto leafPairsIt = std::find(
-		leafPairs.begin(),
-		leafPairs.end(),
-		[=](LeafPair<3> pair) {
-			return std::get<Leaf>(pair) == leaf;
-		});
-	
-	BOOST_REQUIRE_MESSAGE(
-		(octreeIt == octree.leafs().end()) == (leafPairsIt == leafPairs.end()),
-		"failed when searching octree (leaf mismatch)");
-	
-	if (octreeIt != octree.leafs().end()) {
-		octreeIt = octree.erase(octreeIt);
-		leafPairsIt = leafPairs.erase(leafPairsIt);
-	}
-	
-	BOOST_REQUIRE_MESSAGE(
-		check == CheckOrthtreeResult::Success,
-		"failed when removing leaf from octree: " +
-		checkOctreeString(check));
-}
-*/
 
 template<typename LeafPair, typename L, typename N, std::size_t Dim>
 bool compareLeafPair(
@@ -361,7 +291,7 @@ CheckOrthtreeResult checkOrthtree(
 		}
 		
 		for (auto leafPair : leafPairs) {
-			// First, find the leaf within the octree.
+			// First, find the leaf within the orthtree.
 			auto leaf = std::find(
 				node->leafs.begin(),
 				node->leafs.end(),

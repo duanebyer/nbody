@@ -1,5 +1,5 @@
 #include "tensor.h"
-#include "octree.h"
+#include "orthtree.h"
 
 #include <iostream>
 

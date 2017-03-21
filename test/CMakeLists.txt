@@ -5,11 +5,11 @@ include_directories(
 )
 
 add_definitions(-DBOOST_TEST_DYN_LINK)
-add_executable(OctreeTest octree_test.cpp)
+add_executable(OrthtreeTest orthtree_test.cpp)
 target_link_libraries(
-	OctreeTest
+	OrthtreeTest
 	${Boost_UNIT_TEST_FRAMEWORK_LIBRARY}
 )
 
-add_test(NAME OctreeTest COMMAND OctreeTest)
+add_test(NAME OrthtreeTest COMMAND OrthtreeTest)
 
