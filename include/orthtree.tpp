@@ -4,6 +4,7 @@
 #include <algorithm>
 #include <climits>
 #include <cstddef>
+#include <iterator>
 #include <tuple>
 #include <utility>
 #include <vector>
@@ -69,10 +70,10 @@ typename Orthtree<L, N, Dim>::NodeIterator Orthtree<L, N, Dim>::createChildren(
 	// Go through the parent, grandparent, great-grandparent, ...  of this
 	// node and update their child indices.
 	NodeIterator parent = node;
-	while (parent.hasParent()) {
+	while (parent->hasParent) {
 		typename NodeList::size_type siblingIndex;
 		siblingIndex = parent.internalIt()->siblingIndex;
-		parent = parent.parent();
+		parent = parent->parent;
 		while (++siblingIndex < (1 << Dim)) {
 			parent.internalIt()->childIndices[siblingIndex] += (1 << Dim);
 			NodeIterator child = parent->children[siblingIndex];
@@ -84,12 +85,12 @@ typename Orthtree<L, N, Dim>::NodeIterator Orthtree<L, N, Dim>::createChildren(
 	// Distribute the leaves of this node to the children.
 	for (
 			typename LeafList::size_type index = 0;
-			index < node.leafs().size();
+			index < node->leafs.size();
 			++index) {
 		// Figure out which node the leaf belongs to.
 		typename NodeList::size_type childIndex = 0;
-		LeafIterator leaf = node.leafs().begin();
-		Vector<Dim> const& position = leaf.position();
+		LeafIterator leaf = node->leafs.begin();
+		Vector<Dim> const& position = leaf->position;
 		for (std::size_t dim = 0; dim < Dim; ++dim) {
 			if (position[dim] >= midpoint[dim]) {
 				childIndex += (1 << dim);
@@ -158,7 +159,8 @@ typename Orthtree<L, N, Dim>::LeafIterator Orthtree<L, N, Dim>::insertAt(
 		parent = parent->parent;
 	}
 	
-	return node->leafs.end() - 1;
+	LeafIterator result = node->leafs.end(); --result;
+	return result;
 }
 
 template<typename L, typename N, std::size_t Dim>
@@ -194,8 +196,8 @@ typename Orthtree<L, N, Dim>::LeafIterator Orthtree<L, N, Dim>::moveAt(
 		NodeIterator destNode,
 		LeafIterator sourceLeaf) {
 	// Reinsert the leaf into the leaf vector in its new position.
-	LeafIterator destLeaf = destNode->leafs.end() - 1;
-	bool inverted = sourceLeaf > destLeaf;
+	LeafIterator destLeaf = destNode->leafs.end(); --destLeaf;
+	bool inverted = sourceLeaf.internalIt() > destLeaf.internalIt();
 	LeafIterator firstLeaf = inverted ? destLeaf : sourceLeaf;
 	LeafIterator lastLeaf = inverted ? sourceLeaf : destLeaf;
 	
@@ -224,7 +226,9 @@ typename Orthtree<L, N, Dim>::LeafIterator Orthtree<L, N, Dim>::moveAt(
 	
 	// Adjust the nodes in between the source and destination node.
 	std::ptrdiff_t invertedSign = inverted ? -1 : +1;
-	for (NodeIterator node = sourceNode + 1; node <= destNode; ++node) {
+	NodeIterator begin = sourceNode; ++begin;
+	NodeIterator end = destNode;
+	for (NodeIterator node = begin; node != end; ++node) {
 		node.internalIt()->leafIndex -= invertedSign;
 	}
 	
@@ -486,14 +490,14 @@ template<typename L, typename N, std::size_t Dim>
 typename Orthtree<L, N, Dim>::NodeIterator Orthtree<L, N, Dim>::find(
 		ConstNodeIterator hint,
 		Vector<Dim> const& point) {
-	bool contains = hint.contains(point);
+	bool containsPoint = contains(hint, point);
 	// If this node is childless and contains the point, then just return it.
-	if (contains && !hint->hasChildren) {
+	if (containsPoint && !hint->hasChildren) {
 		return NodeIterator(this, hint._index);
 	}
 	// If it is childless but contains the point, then recursively call this
 	// method on the child that also conains the point.
-	else if (contains && hint->hasChildren) {
+	else if (containsPoint && hint->hasChildren) {
 		return find(findChild(hint, point), point);
 	}
 	// If it does not contain the point, then recursively call this method on
@@ -508,14 +512,14 @@ template<typename L, typename N, std::size_t Dim>
 typename Orthtree<L, N, Dim>::NodeIterator Orthtree<L, N, Dim>::find(
 		ConstNodeIterator hint,
 		ConstLeafIterator leaf) {
-	bool contains = hint.contains(leaf);
+	bool containsLeaf = contains(hint, leaf);
 	// If this node is childless and contains the leaf, then return itself.
-	if (contains && !hint->hasChildren) {
+	if (containsLeaf && !hint->hasChildren) {
 		return NodeIterator(this, hint._index);
 	}
 	// If it has children and contains the leaf, then recursively call this
 	// method on the child that contains the leaf.
-	else if (contains && hint->hasChildren) {
+	else if (containsLeaf && hint->hasChildren) {
 		return find(findChild(hint, leaf), leaf);
 	}
 	// If it doesn't contain the leaf, the recursively call this method on the

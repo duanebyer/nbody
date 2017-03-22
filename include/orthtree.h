@@ -6,6 +6,7 @@
 #include <iterator>
 #include <tuple>
 #include <type_traits>
+#include <utility>
 #include <vector>
 
 #include "tensor.h"
@@ -623,8 +624,10 @@ public:
 	 * \brief Determines whether a node contains a leaf.
 	 */
 	bool contains(ConstNodeIterator node, ConstLeafIterator leaf) const {
-		typename LeafList::difference_type index = node.internalIt()->leafIndex;
-		typename LeafList::size_type count = node.internalIt()->leafCount;
+		typename LeafList::difference_type index =
+			(typename LeafList::difference_type) node.internalIt()->leafIndex;
+		typename LeafList::difference_type count =
+			(typename LeafList::difference_type) node.internalIt()->leafCount;
 		return
 			leaf._index >= index &&
 			leaf._index < index + count;
@@ -693,9 +696,9 @@ public:
 	Vector<Dim> const& position;
 	ValueReference value;
 	
-	LeafReferenceProxyBase(LeafReference leaf) :
-			position(leaf.position),
-			value(leaf.value) {
+	LeafReferenceProxyBase(LeafReference leaf) : LeafReferenceProxyBase(
+			leaf.position,
+			leaf.value) {
 	}
 	
 	operator LeafReferenceProxyBase<true>() const {
@@ -758,7 +761,7 @@ private:
 				reference(reference) {
 		}
 		
-		ReferenceProxy* operator->() const {
+		ReferenceProxy* operator->() {
 			return &reference;
 		}
 		
@@ -1082,25 +1085,29 @@ private:
 	using ValueReference = std::conditional_t<
 		Const,
 		N const&,
-		N>;
+		N&>;
 	
+	template<std::size_t... Index>
 	NodeReferenceProxyBase(
-		NodeIteratorBase<Const, false> parent,
-		NodeIteratorBase<Const, false> children[(1 << Dim) + 1],
-		LeafRangeBase<Const> leafs,
-		bool const& hasParent,
-		bool const& hasChildren,
-		typename NodeList::size_type const& depth,
-		Vector<Dim> const& position,
-		Vector<Dim> const& dimensions,
-		ValueReference value) :
-		parent(parent),
-		children(children),
-		leafs(leafs),
-		hasChildren(hasChildren),
-		position(position),
-		dimensions(dimensions),
-		value(value) {
+			NodeIteratorBase<Const, false> parent,
+			NodeIteratorBase<Const, false> children[(1 << Dim) + 1],
+			LeafRangeBase<Const> leafs,
+			bool const& hasParent,
+			bool const& hasChildren,
+			typename NodeList::size_type const& depth,
+			Vector<Dim> const& position,
+			Vector<Dim> const& dimensions,
+			ValueReference value,
+			std::index_sequence<Index...>) :
+			parent(parent),
+			children{children[Index]...},
+			leafs(leafs),
+			hasParent(hasParent),
+			hasChildren(hasChildren),
+			depth(depth),
+			position(position),
+			dimensions(dimensions),
+			value(value) {
 	}
 	
 public:
@@ -1120,16 +1127,17 @@ public:
 	
 	ValueReference value;
 	
-	NodeReferenceProxyBase(NodeReference node) :
-			parent(node.parent),
-			children(node.children),
-			leafs(node.leafs),
-			hasParent(node.hasParent),
-			hasChildren(node.hasChildren),
-			depth(node.depth),
-			position(node.position),
-			dimensions(node.dimensions),
-			value(node.value) {
+	NodeReferenceProxyBase(NodeReference node) : NodeReferenceProxyBase(
+			node.parent,
+			node.children,
+			node.leafs,
+			node.hasParent,
+			node.hasChildren,
+			node.depth,
+			node.position,
+			node.dimensions,
+			node.value,
+			std::make_index_sequence<(1 << Dim) + 1>()) {
 	}
 	
 	operator NodeReferenceProxyBase<true>() const {
@@ -1201,7 +1209,7 @@ private:
 				reference(reference) {
 		}
 		
-		ReferenceProxy* operator->() const {
+		ReferenceProxy* operator->() {
 			return &reference;
 		}
 		
@@ -1282,7 +1290,8 @@ public:
 			_orthtree->_nodes[_index].depth,
 			_orthtree->_nodes[_index].position,
 			_orthtree->_nodes[_index].dimensions,
-			_orthtree->_nodes[_index].value);
+			_orthtree->_nodes[_index].value,
+			std::make_index_sequence<(1 << Dim) + 1>());
 	}
 	pointer operator->() const {
 		return PointerProxy(operator*());

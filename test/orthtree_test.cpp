@@ -293,11 +293,14 @@ CheckOrthtreeResult checkOrthtree(
 		
 		for (auto leafPair : leafPairs) {
 			// First, find the leaf within the orthtree.
-			auto leaf = std::find(
+			auto leaf = std::find_if(
 				node->leafs.begin(),
 				node->leafs.end(),
-				std::bind(compareLeafPair, leafPair));
-			if (leaf == node.leafs().end()) {
+				std::bind(
+					compareLeafPair<LeafPair, L, N, Dim>,
+					leafPair,
+					std::placeholders::_1));
+			if (leaf == node->leafs.end()) {
 				return CheckOrthtreeResult::LeafMissing;
 			}
 			// Then, make sure that it is contained within the bounds of the
@@ -317,8 +320,8 @@ CheckOrthtreeResult checkOrthtree(
 		// of the node's leafs should belong to one and only one child.
 		if (!node->hasChildren) {
 			int depthSign =
-				(node->depth > orthtree->maxDepth) -
-				(node->depth < orthtree->maxDepth);
+				(node->depth > orthtree.maxDepth()) -
+				(node->depth < orthtree.maxDepth());
 			// If the node doesn't have children, then make sure that it doesn't
 			// have too many leafs and that it isn't too deep.
 			if (depthSign < 0 && node->leafs.size() > orthtree.nodeCapacity()) {
@@ -353,10 +356,13 @@ CheckOrthtreeResult checkOrthtree(
 					leafPairs.begin(),
 					leafPairs.end(),
 					[child](LeafPair leafPair) {
-						return child->leafs.end() != std::find(
+						return child->leafs.end() != std::find_if(
 							child->leafs.begin(),
 							child->leafs.end(),
-							std::bind(compareLeafPair, leafPair));
+							std::bind(
+								compareLeafPair<LeafPair, L, N, Dim>,
+								leafPair,
+								std::placeholders::_1));
 					});
 				std::copy(
 					leafPairs.begin(),
