@@ -33,7 +33,7 @@ std::false_type is_invocable_test(...);
  * instead.
  */
 template<typename F, typename... Args>
-struct is_invocable : decltype(is_invocable_test(
+struct is_invocable final : decltype(is_invocable_test(
 		std::declval<F>(),
 		std::declval<Args>()...)) {
 };
@@ -48,7 +48,7 @@ using is_invocable_v = is_invocable<F, Args...>::value;
  * instead.
  */
 template<typename Result, typename F, typename... Args>
-struct is_invocable_r : decltype(is_invocable_r_test(
+struct is_invocable_r final : decltype(is_invocable_r_test(
 		std::declval<Result>(),
 		std::declval<F>(),
 		std::declval<Args>()...)) {

@@ -5,7 +5,6 @@
 #include <climits>
 #include <cstddef>
 #include <functional>
-#include <iterator>
 #include <tuple>
 #include <type_traits>
 #include <utility>
@@ -227,9 +226,9 @@ private:
 	struct LeafInternal final {
 		
 		LeafValue value;
-		Vector<Dim> position;
+		Vector position;
 		
-		LeafInternal(LeafValue value, Vector<Dim> position) :
+		LeafInternal(LeafValue value, Vector position) :
 				value(value),
 				position(position) {
 		}
@@ -266,14 +265,14 @@ private:
 		typename LeafList::size_type leafIndex;
 		
 		// The section of space that this node encompasses.
-		Vector<Dim> position;
-		Vector<Dim> dimensions;
+		Vector position;
+		Vector dimensions;
 		
 		// The data stored at the node itself.
 		NodeValue value;
 		
 		// By default, a node is constructed as if it were an empty root node.
-		NodeInternal() :
+		NodeInternal(Vector position, Vector dimensions) :
 				depth(0),
 				hasChildren(false),
 				childIndices(),
@@ -282,8 +281,8 @@ private:
 				siblingIndex(),
 				leafCount(0),
 				leafIndex(0),
-				position(),
-				dimensions(),
+				position(position),
+				dimensions(dimensions),
 				value() {
 		}
 		
@@ -333,7 +332,7 @@ private:
 	LeafIterator insertAt(
 			NodeIterator node,
 			LeafValue const& value,
-			Vector<Dim> const& position);
+			Vector const& position);
 	
 	// Removes a leaf from a node.
 	LeafIterator eraseAt(
@@ -362,8 +361,8 @@ public:
 	 * destroy nodes to optimize the number of leaves per node }
 	 */
 	Orthtree(
-			Vector<Dim> position,
-			Vector<Dim> dimensions,
+			Vector position,
+			Vector dimensions,
 			typename LeafList::size_type nodeCapacity = 1,
 			typename NodeList::size_type maxDepth = sizeof(Scalar) * CHAR_BIT,
 			bool adjust = true);
@@ -434,7 +433,7 @@ public:
 	 */
 	bool adjust(ConstNodeIterator node);
 	bool adjust() {
-		return adjust(nodes().begin());
+		return adjust(root());
 	}
 	///@}
 	
@@ -457,11 +456,13 @@ public:
 	std::tuple<NodeIterator, LeafIterator> insert(
 			ConstNodeIterator hint,
 			LeafValue const& value,
-			Vector<Dim> const& position);
+			Vector const& position);
 	
 	std::tuple<NodeIterator, LeafIterator> insert(
 			LeafValue const& value,
-			Vector<Dim> const& position);
+			Vector const& position) {
+		return insert(root(), value, position);
+	}
 	///@}
 	
 	///@{
@@ -484,12 +485,19 @@ public:
 	 */
 	template<typename LeafTuple>
 	std::tuple<NodeIterator, LeafIterator> insert(
-			LeafTuple leafPair);
+			ConstNodeIterator hint,
+			LeafTuple leafPair) {
+		return insert(
+			hint,
+			std::get<LeafValue>(leafPair),
+			std::get<Vector>(leafPair));
+	}
 	
 	template<typename LeafTuple>
 	std::tuple<NodeIterator, LeafIterator> insert(
-			ConstNodeIterator hint,
-			LeafTuple leafPair);
+			LeafTuple leafPair) {
+		return insert(root(), leafPair);
+	}
 	///@}
 	
 	///@{
@@ -512,7 +520,9 @@ public:
 			LeafIterator leaf);
 	
 	std::tuple<NodeIterator, LeafIterator> erase(
-			LeafIterator leaf);
+			LeafIterator leaf) {
+		return erase(root(), leaf);
+	}
 	///@}
 	
 	///@{
@@ -534,11 +544,13 @@ public:
 	std::tuple<NodeIterator, NodeIterator, LeafIterator> move(
 			ConstNodeIterator hint,
 			LeafIterator leaf,
-			Vector<Dim> const& position);
+			Vector const& position);
 	
 	std::tuple<NodeIterator, NodeIterator, LeafIterator> move(
 			LeafIterator leaf,
-			Vector<Dim> const& position);
+			Vector const& position) {
+		return move(root(), leaf, position);
+	}
 	///@}
 	
 	///@{
@@ -557,22 +569,22 @@ public:
 	 */
 	NodeIterator find(
 			ConstNodeIterator hint,
-			Vector<Dim> const& point);
+			Vector const& point);
 	
 	NodeIterator find(
-			Vector<Dim> const& point) {
-		return find(nodes().begin(), point);
+			Vector const& point) {
+		return find(root(), point);
 	}
 	
 	ConstNodeIterator find(
 			ConstNodeIterator start,
-			Vector<Dim> const& point) const {
+			Vector const& point) const {
 		return const_cast<Orthtree<L, N, Dim>*>(this)->find(start, point);
 	}
 	
 	ConstNodeIterator find(
-			Vector<Dim> const& point) const {
-		return find(nodes().begin(), point);
+			Vector const& point) const {
+		return find(root(), point);
 	}
 	///@}
 	
@@ -602,7 +614,8 @@ public:
 	ConstNodeIterator find(
 			ConstNodeIterator hint,
 			ConstLeafIterator leaf) const {
-		return const_cast<Orthtree<L, N, Dim>*>(this)->find(hint, leaf);
+		return const_cast<std::remove_const_t<decltype(this)>*>(this)->
+			find(hint, leaf);
 	}
 	
 	ConstNodeIterator find(
@@ -628,11 +641,12 @@ public:
 	 */
 	NodeIterator findChild(
 			ConstNodeIterator node,
-			Vector<Dim> const& point);
+			Vector const& point);
 	ConstNodeIterator findChild(
 			ConstNodeIterator node,
-			Vector<Dim> const& point) const {
-		return const_cast<Orthtree<L, N, Dim>*>(this)->findChild(node, point);
+			Vector const& point) const {
+		return const_cast<std::remove_const_t<decltype(this)>*>(this)->
+			findChild(node, point);
 	}
 	///@}
 	
@@ -652,17 +666,18 @@ public:
 	ConstNodeIterator findChild(
 			ConstNodeIterator node,
 			ConstLeafIterator leaf) const {
-		return const_cast<Orthtree<L, N, Dim>*>(this)->findChild(node, leaf);
+		return const_cast<std::remove_const_t<decltype(this)*>(this)->
+			findChild(node, leaf);
 	}
 	///@}
 	
 	/**
 	 * \brief Determines whether a node contains a point.
 	 */
-	bool contains(ConstNodeIterator node, Vector<Dim> const& point) const {
+	bool contains(ConstNodeIterator node, Vector const& point) const {
 		for (std::size_t dim = 0; dim < Dim; ++dim) {
 			if (!(
-					point[dim] >= node->position[dim] &&
+					node->position[dim] < point[dim] &&
 					point[dim] < node->position[dim] + node->dimensions[dim])) {
 				return false;
 			}
@@ -685,830 +700,7 @@ public:
 	
 };
 
-
-
-/**
- * \brief Provides access to a leaf of the Orthtree.
- * 
- * Note that this type is a proxy to the actual implementation type. Internally,
- * Orthtree uses a private type to store the leaf data.
- */
-template<typename L, typename N, std::size_t Dim>
-struct Orthtree<L, N, Dim>::Leaf final {
-	
-	Vector<Dim> const position;
-	L value;
-	
-	Leaf(Vector<Dim> position, L value) :
-			position(position),
-			value(value) {
-	}
-	
-};
-
-
-
-/**
- * \brief Proxy type that acts as a reference to a Leaf.
- * 
- * This type is able to mimic the behaviour of the `Leaf&` type in most
- * cases. However, pointers to this type do not behave correctly. For
- * example, the address-of operator does not work as it would for a true
- * reference.
- * 
- * \tparam Const whether this is a `const` variant of the reference
- */
-template<typename L, typename N, std::size_t Dim>
-template<bool Const>
-struct Orthtree<L, N, Dim>::LeafReferenceProxyBase final {
-	
-private:
-	
-	template<bool Const_, bool Reverse_>
-	friend class Orthtree<L, N, Dim>::LeafIteratorBase;
-	
-	using LeafReference = std::conditional_t<
-		Const,
-		Leaf const&,
-		Leaf&>;
-	using ValueReference = std::conditional_t<
-		Const,
-		L const&,
-		L>;
-	
-	LeafReferenceProxyBase(Vector<Dim> const& position, ValueReference value) :
-		position(position),
-		value(value) {
-	}
-	
-public:
-	
-	Vector<Dim> const& position;
-	ValueReference value;
-	
-	LeafReferenceProxyBase(LeafReference leaf) : LeafReferenceProxyBase(
-			leaf.position,
-			leaf.value) {
-	}
-	
-	operator LeafReferenceProxyBase<true>() const {
-		return LeafReferenceProxyBase<true>(position, value);
-	}
-	
-	operator Leaf() const {
-		return Leaf(position, value);
-	}
-	
-};
-
-
-
-/**
- * \brief An iterator over the LeafRangeBase container.
- * 
- * The Leaf%s are iterated over in depth-first order.
- * 
- * This iterator meets the requirements of `InputIterator`. It would also
- * the requirements of `BidirectionalIterator` except that the reference type
- * used by this iterator is not `Leaf&`. A proxy reference type
- * LeafReferenceProxyBase is used instead.
- * 
- * \tparam Const whether this is a `const` variant of the iterator
- * \tparam Reverse whether this is a reverse or forward iterator
- */
-template<typename L, typename N, std::size_t Dim>
-template<bool Const, bool Reverse>
-class Orthtree<L, N, Dim>::LeafIteratorBase final {
-	
-private:
-	
-	friend Orthtree<L, N, Dim>;
-	
-	template<bool Const_>
-	friend class Orthtree<L, N, Dim>::LeafRangeBase;
-	
-	using ReferenceProxy = LeafReferenceProxyBase<Const>;
-	using List = LeafList;
-	using ListIterator = std::conditional_t<
-			Const,
-			typename LeafList::const_iterator,
-			typename LeafList::iterator>;
-	using ListReference = std::conditional_t<
-			Const,
-			typename LeafList::const_reference,
-			typename LeafList::reference>;
-	using OrthtreePointer = std::conditional_t<
-			Const,
-			Orthtree<L, N, Dim> const*,
-			Orthtree<L, N, Dim>*>;
-	
-	// This type is used by the arrow (->) operator.
-	struct PointerProxy {
-		
-		ReferenceProxy reference;
-		
-		PointerProxy(ReferenceProxy reference) :
-				reference(reference) {
-		}
-		
-		ReferenceProxy* operator->() {
-			return &reference;
-		}
-		
-	};
-	
-	OrthtreePointer _orthtree;
-	typename List::difference_type _index;
-	
-	LeafIteratorBase(
-			OrthtreePointer orthtree,
-			typename List::difference_type index) :
-			_orthtree(orthtree),
-			_index(index) {
-	}
-	
-	// Converts this iterator to an iterator over the internal leaf type.
-	ListIterator internalIt() const {
-		return _orthtree->_leafs.begin() + _index;
-	}
-	
-public:
-	
-	// Iterator typedefs.
-	using value_type = Leaf;
-	using reference = ReferenceProxy;
-	using pointer = PointerProxy;
-	using size_type = typename List::size_type;
-	using difference_type = typename List::difference_type;
-	using iterator_category = std::input_iterator_tag;
-	
-	LeafIteratorBase() :
-			_orthtree(NULL),
-			_index(0) {
-	}
-	
-	operator LeafIteratorBase<true, Reverse>() const {
-		return LeafIteratorBase<true, Reverse>(_orthtree, _index);
-	}
-	
-	/**
-	 * \brief Flips the direction of the iterator.
-	 * 
-	 * This method transforms a forward iterator into a reverse iterator, and a
-	 * reverse iterator into a forward iterator. Note that the resulting
-	 * does not point to the same value as the original iterator (same behaviour
-	 * as `std::reverse_iterator<...>::base()`).
-	 */
-	LeafIteratorBase<Const, !Reverse> reverse() const {
-		difference_type shift = !Reverse ? -1 : +1;
-		return LeafIteratorBase<Const, !Reverse>(_orthtree, _index + shift);
-	}
-	
-	// Iterator element access methods.
-	reference operator*() const {
-		return LeafReferenceProxyBase<Const>(
-			_orthtree->_leafs[_index].position,
-			_orthtree->_leafs[_index].value);
-	}
-	pointer operator->() const {
-		return PointerProxy(operator*());
-	}
-	
-	// Iterator increment methods.
-	LeafIteratorBase<Const, Reverse>& operator++() {
-		difference_type shift = Reverse ? -1 : +1;
-		_index += shift;
-		return *this;
-	}
-	LeafIteratorBase<Const, Reverse> operator++(int) {
-		LeafIteratorBase<Const, Reverse> result = *this;
-		operator++();
-		return result;
-	}
-	
-	LeafIteratorBase<Const, Reverse>& operator--() {
-		difference_type shift = Reverse ? +1 : -1;
-		_index += shift;
-		return *this;
-	}
-	LeafIteratorBase<Const, Reverse> operator--(int) {
-		LeafIteratorBase<Const, Reverse> result = *this;
-		operator--();
-		return result;
-	}
-	
-	// Iterator comparison methods.
-	friend bool operator==(
-			LeafIteratorBase<Const, Reverse> const& lhs,
-			LeafIteratorBase<Const, Reverse> const& rhs) {
-		return lhs._orthtree == rhs._orthtree && lhs._index == rhs._index;
-	}
-	friend bool operator!=(
-			LeafIteratorBase<Const, Reverse> const& lhs,
-			LeafIteratorBase<Const, Reverse> const& rhs) {
-		return !(lhs == rhs);
-	}
-	
-};
-
-
-
-/**
- * \brief A pseudo-container that provides access to a collection of leaves
- * from an Orthtree.
- * 
- * The leaves are stored in depth-first order.
- * 
- * This container partially meets the requirements of `ReversibleContainer`. The
- * differences arise because a range cannot be created, and which elements it
- * contains cannot be changed. A range must be obtained from the Orthtree class.
- * 
- * \tparam Const whether this container allows for modifying its elements
- */
-template<typename L, typename N, std::size_t Dim>
-template<bool Const>
-class Orthtree<L, N, Dim>::LeafRangeBase final {
-	
-private:
-	
-	friend Orthtree<L, N, Dim>;
-	
-	template<bool Const_, bool Reverse_>
-	friend class Orthtree<L, N, Dim>::NodeIteratorBase;
-	
-	using OrthtreePointer = std::conditional_t<
-			Const,
-			Orthtree<L, N, Dim> const*,
-			Orthtree<L, N, Dim>*>;
-	
-	OrthtreePointer _orthtree;
-	typename LeafIterator::size_type _lowerIndex;
-	typename LeafIterator::size_type _upperIndex;
-	
-	LeafRangeBase(
-			OrthtreePointer orthtree,
-			typename LeafIterator::size_type lowerIndex,
-			typename LeafIterator::size_type upperIndex) :
-			_orthtree(orthtree),
-			_lowerIndex(lowerIndex),
-			_upperIndex(upperIndex) {
-	}
-	
-public:
-	
-	// Container typedefs.
-	using iterator = LeafIterator;
-	using const_iterator = ConstLeafIterator;
-	using reverse_iterator = ReverseLeafIterator;
-	using const_reverse_iterator = ConstReverseLeafIterator;
-	
-	using value_type = typename iterator::value_type;
-	using reference = typename iterator::reference;
-	using const_reference = typename const_iterator::reference;
-	using pointer = typename iterator::pointer;
-	using const_pointer = typename const_iterator::pointer;
-	using size_type = typename iterator::size_type;
-	using difference_type = typename iterator::difference_type;
-	
-	operator LeafRangeBase<true>() const {
-		return LeafRangeBase<true>(_orthtree, _lowerIndex, _upperIndex);
-	}
-	
-	// Container iteration range methods.
-	std::conditional_t<Const, const_iterator, iterator> begin() const {
-		return std::conditional_t<
-			Const,
-			const_iterator,
-			iterator>(
-			_orthtree,
-			_lowerIndex);
-	}
-	const_iterator cbegin() const {
-		return const_iterator(_orthtree, _lowerIndex);
-	}
-	
-	std::conditional_t<Const, const_iterator, iterator> end() const {
-		return std::conditional_t<
-			Const,
-			const_iterator,
-			iterator>(
-			_orthtree,
-			_upperIndex);
-	}
-	const_iterator cend() const {
-		return const_iterator(_orthtree, _upperIndex);
-	}
-	
-	std::conditional_t<Const, const_reverse_iterator, reverse_iterator>
-			rbegin() const {
-		return std::conditional_t<
-			Const,
-			const_reverse_iterator,
-			reverse_iterator>(
-			_orthtree, _upperIndex - 1);
-	}
-	const_reverse_iterator crbegin() const {
-		return const_reverse_iterator(_orthtree, _upperIndex - 1);
-	}
-	
-	std::conditional_t<Const, const_reverse_iterator, reverse_iterator>
-			rend() const {
-		return std::conditional_t<
-			Const,
-			const_reverse_iterator,
-			reverse_iterator>(
-			_orthtree, _lowerIndex - 1);
-	}
-	const_reverse_iterator crend() const {
-		return const_reverse_iterator(_orthtree, _lowerIndex - 1);
-	}
-	
-	// Container size methods.
-	size_type size() const {
-		return _upperIndex - _lowerIndex;
-	}
-	size_type max_size() const {
-		return size();
-	}
-	bool empty() const {
-		return _upperIndex == _lowerIndex;
-	}
-	
-};
-
-
-
-/**
- * \brief Provides access to a node of the Orthtree.
- * 
- * Note that this type is a proxy to the actual implementation type. Internally,
- * Orthtree uses a private type to store the node data.
- * 
- * This type comes in `const` and non-`const` variants, since it provides access
- * to traversal of the Orthtree. The `const` variant stores ConstNodeIterator%s
- * to the parent and children of this node, while the non-`const` variant stores
- * NodeIterator%s.
- * 
- * \tparam Const whether this is a `const` variant of the node
- */
-template<typename L, typename N, std::size_t Dim>
-template<bool Const>
-struct Orthtree<L, N, Dim>::NodeBase final {
-	
-	NodeIteratorBase<Const, false> const parent;
-	/**
-	 * \brief An array of iterators, one to each child of the Node.
-	 * 
-	 * Note that this array has a length of 1 larger than the actual number of
-	 * children. The last element of the array points to the next sibling of
-	 * this Node.
-	 */
-	NodeIteratorBase<Const, false> const children[(1 << Dim) + 1];
-	
-	LeafRangeBase<Const> const leafs;
-	
-	bool const hasParent;
-	bool const hasChildren;
-	
-	/**
-	 * \brief The number of generations below the root node that this node is
-	 * located.
-	 * 
-	 * The root node has a depth of 0, its children have a depth of 1, and so
-	 * on.
-	 */
-	typename NodeList::size_type const depth;
-	
-	Vector<Dim> const position;
-	Vector<Dim> const dimensions;
-	
-	N value;
-	
-	NodeBase(
-			NodeIteratorBase<Const, false> parent,
-			NodeIteratorBase<Const, false> children[(1 << Dim) + 1],
-			LeafRangeBase<Const> leafs,
-			bool hasParent,
-			bool hasChildren,
-			typename NodeList::size_type depth,
-			Vector<Dim> position,
-			Vector<Dim> dimensions,
-			N value) :
-			parent(parent),
-			children(children),
-			leafs(leafs),
-			hasParent(hasParent),
-			hasChildren(hasChildren),
-			depth(depth),
-			position(position),
-			dimensions(dimensions),
-			value(value) {
-	}
-	
-};
-
-
-
-/**
- * \brief Proxy type that acts as a reference to a Node.
- * 
- * This type is able to mimic the behaviour of the `Node&` type in most
- * cases. However, pointers to this type do not behave correctly. For
- * example, the address-of operator does not work as it would for a true
- * reference.
- * 
- * \tparam Const whether this is a `const` variant of the reference
- */
-template<typename L, typename N, std::size_t Dim>
-template<bool Const>
-struct Orthtree<L, N, Dim>::NodeReferenceProxyBase final {
-	
-private:
-	
-	template<bool Const_, bool Reverse_>
-	friend class Orthtree<L, N, Dim>::NodeIteratorBase;
-	
-	using NodeReference = std::conditional_t<
-		Const,
-		Node const&,
-		Node&>;
-	using ValueReference = std::conditional_t<
-		Const,
-		N const&,
-		N&>;
-	
-	template<std::size_t... Index>
-	NodeReferenceProxyBase(
-			NodeIteratorBase<Const, false> parent,
-			NodeIteratorBase<Const, false> children[(1 << Dim) + 1],
-			LeafRangeBase<Const> leafs,
-			bool const& hasParent,
-			bool const& hasChildren,
-			typename NodeList::size_type const& depth,
-			Vector<Dim> const& position,
-			Vector<Dim> const& dimensions,
-			ValueReference value,
-			std::index_sequence<Index...>) :
-			parent(parent),
-			children{children[Index]...},
-			leafs(leafs),
-			hasParent(hasParent),
-			hasChildren(hasChildren),
-			depth(depth),
-			position(position),
-			dimensions(dimensions),
-			value(value) {
-	}
-	
-public:
-	
-	NodeIteratorBase<Const, false> const parent;
-	NodeIteratorBase<Const, false> const children[(1 << Dim) + 1];
-	
-	LeafRangeBase<Const> const leafs;
-	
-	bool const& hasParent;
-	bool const& hasChildren;
-	
-	typename NodeList::size_type const& depth;
-	
-	Vector<Dim> const& position;
-	Vector<Dim> const& dimensions;
-	
-	ValueReference value;
-	
-	NodeReferenceProxyBase(NodeReference node) : NodeReferenceProxyBase(
-			node.parent,
-			node.children,
-			node.leafs,
-			node.hasParent,
-			node.hasChildren,
-			node.depth,
-			node.position,
-			node.dimensions,
-			node.value,
-			std::make_index_sequence<(1 << Dim) + 1>()) {
-	}
-	
-	operator NodeReferenceProxyBase<true>() const {
-		return NodeReferenceProxyBase<true>(position, value);
-	}
-	
-	operator NodeBase<Const>() const {
-		return NodeBase<Const>(
-			parent,
-			children,
-			leafs,
-			hasParent,
-			hasChildren,
-			depth,
-			position,
-			dimensions,
-			value);
-	}
-	
-};
-
-
-
-/**
- * \brief An iterator over the NodeRangeBase container.
- * 
- * The Node%s are iterated over in depth-first order.
- * 
- * This iterator meets the requirements of `InputIterator`. It would also
- * the requirements of `BidirectionalIterator` except that the reference type
- * used by this iterator is not `Node&`. A proxy reference type
- * NodeReferenceProxyBase is used instead.
- * 
- * \tparam Const whether this is a `const` variant of the iterator
- * \tparam Reverse whether this is a reverse or forward iterator
- */
-template<typename L, typename N, std::size_t Dim>
-template<bool Const, bool Reverse>
-class Orthtree<L, N, Dim>::NodeIteratorBase final {
-	
-private:
-	
-	friend Orthtree<L, N, Dim>;
-	
-	template<bool Const_>
-	friend class Orthtree<L, N, Dim>::NodeRangeBase;
-	
-	using ReferenceProxy = NodeReferenceProxyBase<Const>;
-	using List = NodeList;
-	using ListIterator = std::conditional_t<
-			Const,
-			typename NodeList::const_iterator,
-			typename NodeList::iterator>;
-	using ListReference = std::conditional_t<
-			Const,
-			typename NodeList::const_reference,
-			typename NodeList::reference>;
-	using OrthtreePointer = std::conditional_t<
-			Const,
-			Orthtree<L, N, Dim> const*,
-			Orthtree<L, N, Dim>*>;
-	
-	// This type is used by the arrow (->) operator.
-	struct PointerProxy {
-		
-		ReferenceProxy reference;
-		
-		PointerProxy(ReferenceProxy reference) :
-				reference(reference) {
-		}
-		
-		ReferenceProxy* operator->() {
-			return &reference;
-		}
-		
-	};
-	
-	OrthtreePointer _orthtree;
-	typename List::difference_type _index;
-	
-	NodeIteratorBase(
-			OrthtreePointer orthtree,
-			typename List::difference_type index) :
-			_orthtree(orthtree),
-			_index(index) {
-	}
-	
-	// Converts this iterator to an iterator over the internal node type.
-	ListIterator internalIt() const {
-		return _orthtree->_nodes.begin() + _index;
-	}
-	
-public:
-	
-	// Iterator typedefs.
-	using value_type = Node;
-	using reference = ReferenceProxy;
-	using pointer = PointerProxy;
-	using size_type = typename List::size_type;
-	using difference_type = typename List::difference_type;
-	using iterator_category = std::input_iterator_tag;
-	
-	NodeIteratorBase() :
-			_orthtree(NULL),
-			_index(0) {
-	}
-	
-	operator NodeIteratorBase<true, Reverse>() const {
-		return NodeIteratorBase<true, Reverse>(_orthtree, _index);
-	}
-	
-	/**
-	 * \brief Flips the direction of the iterator.
-	 * 
-	 * This method transforms a forward iterator into a reverse iterator, and a
-	 * reverse iterator into a forward iterator. Note that the resulting
-	 * does not point to the same value as the original iterator (same behaviour
-	 * as `std::reverse_iterator<...>::base()`).
-	 */
-	NodeIteratorBase<Const, !Reverse> reverse() const {
-		difference_type shift = !Reverse ? -1 : +1;
-		return NodeIteratorBase<Const, !Reverse>(_orthtree, _index + shift);
-	}
-	
-	// Iterator element access methods.
-	reference operator*() const {
-		NodeIteratorBase<Const, false> parent(
-			_orthtree,
-			_index + _orthtree->_nodes[_index].parentIndex);
-		NodeIteratorBase<Const, false> children[(1 << Dim) + 1];
-		for (
-				std::size_t childIndex = 0;
-				childIndex < (1 << Dim) + 1;
-				++childIndex) {
-			children[childIndex] = NodeIteratorBase<Const, false>(
-				_orthtree,
-				_index + _orthtree->_nodes[_index].childIndices[childIndex]);
-		}
-		LeafRangeBase<Const> leafs(
-			_orthtree,
-			_orthtree->_nodes[_index].leafIndex,
-			_orthtree->_nodes[_index].leafIndex +
-			_orthtree->_nodes[_index].leafCount);
-		return NodeReferenceProxyBase<Const>(
-			parent,
-			children,
-			leafs,
-			_orthtree->_nodes[_index].hasParent,
-			_orthtree->_nodes[_index].hasChildren,
-			_orthtree->_nodes[_index].depth,
-			_orthtree->_nodes[_index].position,
-			_orthtree->_nodes[_index].dimensions,
-			_orthtree->_nodes[_index].value,
-			std::make_index_sequence<(1 << Dim) + 1>());
-	}
-	pointer operator->() const {
-		return PointerProxy(operator*());
-	}
-	
-	// Iterator increment methods.
-	NodeIteratorBase<Const, Reverse>& operator++() {
-		difference_type shift = Reverse ? -1 : +1;
-		_index += shift;
-		return *this;
-	}
-	NodeIteratorBase<Const, Reverse> operator++(int) {
-		NodeIteratorBase<Const, Reverse> result = *this;
-		operator++();
-		return result;
-	}
-	
-	NodeIteratorBase<Const, Reverse>& operator--() {
-		difference_type shift = Reverse ? +1 : -1;
-		_index += shift;
-		return *this;
-	}
-	NodeIteratorBase<Const, Reverse> operator--(int) {
-		NodeIteratorBase<Const, Reverse> result = *this;
-		operator--();
-		return result;
-	}
-	
-	// Iterator comparison methods.
-	friend bool operator==(
-			NodeIteratorBase<Const, Reverse> const& lhs,
-			NodeIteratorBase<Const, Reverse> const& rhs) {
-		return lhs._orthtree == rhs._orthtree && lhs._index == rhs._index;
-	}
-	friend bool operator!=(
-			NodeIteratorBase<Const, Reverse> const& lhs,
-			NodeIteratorBase<Const, Reverse> const& rhs) {
-		return !(lhs == rhs);
-	}
-	
-};
-
-
-
-/**
- * \brief A pseudo-container that provides access to a collection of nodes
- * from an Orthtree.
- * 
- * The nodes are stored in depth-first order.
- * 
- * This container partially meets the requirements of `ReversibleContainer`. The
- * differences arise because a range cannot be created, and which elements it
- * contains cannot be changed. A range must be obtained from the Orthtree class.
- * 
- * \tparam Const whether this container allows for modifying its elements
- */
-template<typename L, typename N, std::size_t Dim>
-template<bool Const>
-class Orthtree<L, N, Dim>::NodeRangeBase final {
-	
-private:
-	
-	friend Orthtree<L, N, Dim>;
-	
-	using OrthtreePointer = std::conditional_t<
-			Const,
-			Orthtree<L, N, Dim> const*,
-			Orthtree<L, N, Dim>*>;
-	
-	OrthtreePointer _orthtree;
-	typename NodeIterator::size_type _lowerIndex;
-	typename NodeIterator::size_type _upperIndex;
-	
-	NodeRangeBase(
-			OrthtreePointer orthtree,
-			typename NodeIterator::size_type lowerIndex,
-			typename NodeIterator::size_type upperIndex) :
-			_orthtree(orthtree),
-			_lowerIndex(lowerIndex),
-			_upperIndex(upperIndex) {
-	}
-	
-public:
-	
-	// Container typedefs.
-	using iterator = NodeIterator;
-	using const_iterator = ConstNodeIterator;
-	using reverse_iterator = ReverseNodeIterator;
-	using const_reverse_iterator = ConstReverseNodeIterator;
-	
-	using value_type = typename iterator::value_type;
-	using reference = typename iterator::reference;
-	using const_reference = typename const_iterator::reference;
-	using pointer = typename iterator::pointer;
-	using const_pointer = typename const_iterator::pointer;
-	using size_type = typename iterator::size_type;
-	using difference_type = typename iterator::difference_type;
-	
-	operator NodeRangeBase<true>() const {
-		return NodeRangeBase<true>(_orthtree, _lowerIndex, _upperIndex);
-	}
-	
-	// Container iteration range methods.
-	std::conditional_t<Const, const_iterator, iterator> begin() const {
-		return std::conditional_t<
-			Const,
-			const_iterator,
-			iterator>(
-			_orthtree,
-			_lowerIndex);
-	}
-	const_iterator cbegin() const {
-		return const_iterator(_orthtree, _lowerIndex);
-	}
-	
-	std::conditional_t<Const, const_iterator, iterator> end() const {
-		return std::conditional_t<
-			Const,
-			const_iterator,
-			iterator>(
-			_orthtree,
-			_upperIndex);
-	}
-	const_iterator cend() const {
-		return const_iterator(_orthtree, _upperIndex);
-	}
-	
-	std::conditional_t<Const, const_reverse_iterator, reverse_iterator>
-			rbegin() const {
-		return std::conditional_t<
-			Const,
-			const_reverse_iterator,
-			reverse_iterator>(
-			_orthtree, _upperIndex - 1);
-	}
-	const_reverse_iterator crbegin() const {
-		return const_reverse_iterator(_orthtree, _upperIndex - 1);
-	}
-	
-	std::conditional_t<Const, const_reverse_iterator, reverse_iterator>
-			rend() const {
-		return std::conditional_t<
-			Const,
-			const_reverse_iterator,
-			reverse_iterator>(
-			_orthtree, _lowerIndex - 1);
-	}
-	const_reverse_iterator crend() const {
-		return const_reverse_iterator(_orthtree, _lowerIndex - 1);
-	}
-	
-	// Container size methods.
-	size_type size() const {
-		return _upperIndex - _lowerIndex;
-	}
-	size_type max_size() const {
-		return size();
-	}
-	bool empty() const {
-		return _upperIndex == _lowerIndex;
-	}
-	
-};
-
 }
-
-#include "orthtree.tpp"
 
 #endif
 

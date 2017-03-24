@@ -1,5 +1,12 @@
-#ifndef __NBODY_ORTHTREE_TPP_
-#define __NBODY_ORTHTREE_TPP_
+#ifndef __NBODY_ORTHTREE_ORTHTREE_TPP_
+#define __NBODY_ORTHTREE_ORTHTREE_TPP_
+
+#include "orthtree/orthtree.h"
+
+#include "orthtree/iterator.h"
+#include "orthtree/range.h"
+#include "orthtree/reference.h"
+#include "orthtree/value.h"
 
 #include <algorithm>
 #include <climits>
@@ -9,16 +16,16 @@
 #include <utility>
 #include <vector>
 
-using namespace nbody;
+namespace nbody {
 
-// *----------------*
-// | Orthtree methods |
-// *----------------*
-
-template<typename L, typename N, std::size_t Dim>
-Orthtree<L, N, Dim>::Orthtree(
-		Vector<Dim> position,
-		Vector<Dim> dimensions,
+template<
+	std::size_t Dim,
+	typename Vector,
+	typename LeafValue,
+	typename NodeValue>
+Orthtree<Dim, Vector, LeafValue, NodeValue>::Orthtree(
+		Vector position,
+		Vector dimensions,
 		typename LeafList::size_type nodeCapacity,
 		typename NodeList::size_type maxDepth,
 		bool adjust) :
@@ -27,22 +34,26 @@ Orthtree<L, N, Dim>::Orthtree(
 		_nodeCapacity(nodeCapacity),
 		_maxDepth(maxDepth),
 		_adjust(adjust) {
-	NodeInternal root;
-	root.position = position;
-	root.dimensions = dimensions;
+	NodeInternal root(position, dimensions);
 	_nodes.insert(_nodes.begin(), root);
 }
 
-template<typename L, typename N, std::size_t Dim>
-typename Orthtree<L, N, Dim>::NodeIterator Orthtree<L, N, Dim>::createChildren(
+template<
+	std::size_t Dim,
+	typename Vector,
+	typename LeafValue,
+	typename NodeValue>
+typename Orthtree<Dim, Vector, LeafValue, NodeValue>::NodeIterator
+Orthtree<Dim, Vector, LeafValue, NodeValue>::createChildren(
 		NodeIterator node) {
 	// Create the 2^Dim child nodes inside the list of nodes. This will not
 	// invalidate the node iterator.
-	_nodes.insert(node.internalIt() + 1, 1 << Dim, NodeInternal());
+	_nodes.insert(
+		node.internalIt() + 1,
+		1 << Dim,
+		NodeInternal(node->position, node->dimensions));
 	
 	// Loop through the new children, and set up their various properties.
-	Vector<Dim> childDimensions = node->dimensions / 2;
-	Vector<Dim> midpoint = node->position + childDimensions;
 	for (std::size_t index = 0; index < (1 << Dim); ++index) {
 		NodeInternal& child = *(node.internalIt() + index + 1);
 		child.depth = node->depth + 1;
@@ -52,12 +63,12 @@ typename Orthtree<L, N, Dim>::NodeIterator Orthtree<L, N, Dim>::createChildren(
 		child.leafIndex =
 			node.internalIt()->leafIndex +
 			node.internalIt()->leafCount;
-		child.dimensions = childDimensions;
-		child.position = node->position;
-		// Shift the child position depending on which child it is.
+		// Position and size the child node.
 		for (std::size_t dim = 0; dim < Dim; ++dim) {
+			child.dimensions[dim] = child.dimensions[dim] / 2;
 			if ((1 << dim) & index) {
-				child.position[dim] = midpoint[dim];
+				child.position[dim] =
+					child.position[dim] + node->dimensions[dim] / 2;
 			}
 		}
 		
@@ -90,9 +101,11 @@ typename Orthtree<L, N, Dim>::NodeIterator Orthtree<L, N, Dim>::createChildren(
 		// Figure out which node the leaf belongs to.
 		typename NodeList::size_type childIndex = 0;
 		LeafIterator leaf = node->leafs.begin();
-		Vector<Dim> const& position = leaf->position;
+		Vector const& position = leaf->position;
 		for (std::size_t dim = 0; dim < Dim; ++dim) {
-			if (position[dim] >= midpoint[dim]) {
+			if (
+					node->position[dim] + node->dimensions[dim] / 2 <
+					position[dim]) {
 				childIndex += (1 << dim);
 			}
 		}
@@ -102,8 +115,13 @@ typename Orthtree<L, N, Dim>::NodeIterator Orthtree<L, N, Dim>::createChildren(
 	return node;
 }
 
-template<typename L, typename N, std::size_t Dim>
-typename Orthtree<L, N, Dim>::NodeIterator Orthtree<L, N, Dim>::destroyChildren(
+template<
+	std::size_t Dim,
+	typename Vector,
+	typename LeafValue,
+	typename NodeValue>
+typename Orthtree<Dim, Vector, LeafValue, NodeValue>::NodeIterator
+Orthtree<Dim, Vector, LeafValue, NodeValue>::destroyChildren(
 		NodeIterator node) {
 	// Determine how many children, grandchildren, great-grandchildren, ...
 	// of this node.
@@ -133,11 +151,16 @@ typename Orthtree<L, N, Dim>::NodeIterator Orthtree<L, N, Dim>::destroyChildren(
 	return node;
 }
 
-template<typename L, typename N, std::size_t Dim>
-typename Orthtree<L, N, Dim>::LeafIterator Orthtree<L, N, Dim>::insertAt(
+template<
+	std::size_t Dim,
+	typename Vector,
+	typename LeafValue,
+	typename NodeValue>
+typename Orthtree<Dim, Vector, LeafValue, NodeValue>::LeafIterator
+Orthtree<Dim, Vector, LeafValue, NodeValue>::insertAt(
 		NodeIterator node,
 		L const& value,
-		Vector<Dim> const& position) {
+		Vector const& position) {
 	// Add the leaf to the master list of leaves in the orthtree.
 	_leafs.insert(
 		node->leafs.end().internalIt(),
@@ -163,8 +186,13 @@ typename Orthtree<L, N, Dim>::LeafIterator Orthtree<L, N, Dim>::insertAt(
 	return result;
 }
 
-template<typename L, typename N, std::size_t Dim>
-typename Orthtree<L, N, Dim>::LeafIterator Orthtree<L, N, Dim>::eraseAt(
+template<
+	std::size_t Dim,
+	typename Vector,
+	typename LeafValue,
+	typename NodeValue>
+typename Orthtree<Dim, Vector, LeafValue, NodeValue>::LeafIterator
+Orthtree<Dim, Vector, LeafValue, NodeValue>::eraseAt(
 		NodeIterator node,
 		LeafIterator leaf) {
 	// Remove the leaf from the master orthtree leaf vector.
@@ -190,8 +218,13 @@ typename Orthtree<L, N, Dim>::LeafIterator Orthtree<L, N, Dim>::eraseAt(
 	return leaf;
 }
 
-template<typename L, typename N, std::size_t Dim>
-typename Orthtree<L, N, Dim>::LeafIterator Orthtree<L, N, Dim>::moveAt(
+template<
+	std::size_t Dim,
+	typename Vector,
+	typename LeafValue,
+	typename NodeValue>
+typename Orthtree<Dim, Vector, LeafValue, NodeValue>::LeafIterator
+Orthtree<Dim, Vector, LeafValue, NodeValue>::moveAt(
 		NodeIterator sourceNode,
 		NodeIterator destNode,
 		LeafIterator sourceLeaf) {
@@ -235,63 +268,103 @@ typename Orthtree<L, N, Dim>::LeafIterator Orthtree<L, N, Dim>::moveAt(
 	return destLeaf;
 }
 
-template<typename L, typename N, std::size_t Dim>
-typename Orthtree<L, N, Dim>::LeafRange
-Orthtree<L, N, Dim>::leafs() {
+template<
+	std::size_t Dim,
+	typename Vector,
+	typename LeafValue,
+	typename NodeValue>
+typename Orthtree<Dim, Vector, LeafValue, NodeValue>::LeafRange
+Orthtree<Dim, Vector, LeafValue, NodeValue>::leafs() {
 	return LeafRange(this, 0, _leafs.size());
 }
 
-template<typename L, typename N, std::size_t Dim>
-typename Orthtree<L, N, Dim>::ConstLeafRange
-Orthtree<L, N, Dim>::leafs() const {
+template<
+	std::size_t Dim,
+	typename Vector,
+	typename LeafValue,
+	typename NodeValue>
+typename Orthtree<Dim, Vector, LeafValue, NodeValue>::ConstLeafRange
+Orthtree<Dim, Vector, LeafValue, NodeValue>::leafs() const {
 	return ConstLeafRange(this, 0, _leafs.size());
 }
 
-template<typename L, typename N, std::size_t Dim>
-typename Orthtree<L, N, Dim>::ConstLeafRange
-Orthtree<L, N, Dim>::cleafs() const {
+template<
+	std::size_t Dim,
+	typename Vector,
+	typename LeafValue,
+	typename NodeValue>
+typename Orthtree<Dim, Vector, LeafValue, NodeValue>::ConstLeafRange
+Orthtree<Dim, Vector, LeafValue, NodeValue>::cleafs() const {
 	return ConstLeafRange(this, 0, _leafs.size());
 }
 
-template<typename L, typename N, std::size_t Dim>
-typename Orthtree<L, N, Dim>::NodeRange
-Orthtree<L, N, Dim>::nodes() {
+template<
+	std::size_t Dim,
+	typename Vector,
+	typename LeafValue,
+	typename NodeValue>
+typename Orthtree<Dim, Vector, LeafValue, NodeValue>::NodeRange
+Orthtree<Dim, Vector, LeafValue, NodeValue>::nodes() {
 	return NodeRange(this, 0, _nodes.size());
 }
 
-template<typename L, typename N, std::size_t Dim>
-typename Orthtree<L, N, Dim>::ConstNodeRange
-Orthtree<L, N, Dim>::nodes() const {
+template<
+	std::size_t Dim,
+	typename Vector,
+	typename LeafValue,
+	typename NodeValue>
+typename Orthtree<Dim, Vector, LeafValue, NodeValue>::ConstNodeRange
+Orthtree<Dim, Vector, LeafValue, NodeValue>::nodes() const {
 	return ConstNodeRange(this, 0, _nodes.size());
 }
 
-template<typename L, typename N, std::size_t Dim>
-typename Orthtree<L, N, Dim>::ConstNodeRange
-Orthtree<L, N, Dim>::cnodes() const {
+template<
+	std::size_t Dim,
+	typename Vector,
+	typename LeafValue,
+	typename NodeValue>
+typename Orthtree<Dim, Vector, LeafValue, NodeValue>::ConstNodeRange
+Orthtree<Dim, Vector, LeafValue, NodeValue>::cnodes() const {
 	return ConstNodeRange(this, 0, _nodes.size());
 }
 
-template<typename L, typename N, std::size_t Dim>
-typename Orthtree<L, N, Dim>::NodeIterator
-Orthtree<L, N, Dim>::root() {
+template<
+	std::size_t Dim,
+	typename Vector,
+	typename LeafValue,
+	typename NodeValue>
+typename Orthtree<Dim, Vector, LeafValue, NodeValue>::NodeIterator
+Orthtree<Dim, Vector, LeafValue, NodeValue>::root() {
 	return NodeIterator(this, 0);
 }
 
-template<typename L, typename N, std::size_t Dim>
-typename Orthtree<L, N, Dim>::ConstNodeIterator
-Orthtree<L, N, Dim>::root() const {
+template<
+	std::size_t Dim,
+	typename Vector,
+	typename LeafValue,
+	typename NodeValue>
+typename Orthtree<Dim, Vector, LeafValue, NodeValue>::ConstNodeIterator
+Orthtree<Dim, Vector, LeafValue, NodeValue>::root() const {
 	return ConstNodeIterator(this, 0);
 }
 
-template<typename L, typename N, std::size_t Dim>
-typename Orthtree<L, N, Dim>::ConstNodeIterator
-Orthtree<L, N, Dim>::croot() const {
+template<
+	std::size_t Dim,
+	typename Vector,
+	typename LeafValue,
+	typename NodeValue>
+typename Orthtree<Dim, Vector, LeafValue, NodeValue>::ConstNodeIterator
+Orthtree<Dim, Vector, LeafValue, NodeValue>::croot() const {
 	return ConstNodeIterator(this, 0);
 }
 
-template<typename L, typename N, std::size_t Dim>
-typename Orthtree<L, N, Dim>::NodeRange
-Orthtree<L, N, Dim>::descendants(
+template<
+	std::size_t Dim,
+	typename Vector,
+	typename LeafValue,
+	typename NodeValue>
+typename Orthtree<Dim, Vector, LeafValue, NodeValue>::NodeRange
+Orthtree<Dim, Vector, LeafValue, NodeValue>::descendants(
 		ConstNodeIterator node) {
 	return NodeRange(
 		this,
@@ -299,9 +372,13 @@ Orthtree<L, N, Dim>::descendants(
 		node->children[1 << Dim]._index);
 }
 
-template<typename L, typename N, std::size_t Dim>
-typename Orthtree<L, N, Dim>::ConstNodeRange
-Orthtree<L, N, Dim>::descendants(
+template<
+	std::size_t Dim,
+	typename Vector,
+	typename LeafValue,
+	typename NodeValue>
+typename Orthtree<Dim, Vector, LeafValue, NodeValue>::ConstNodeRange
+Orthtree<Dim, Vector, LeafValue, NodeValue>::descendants(
 		ConstNodeIterator node) const {
 	return ConstNodeRange(
 		this,
@@ -309,9 +386,13 @@ Orthtree<L, N, Dim>::descendants(
 		node->children[1 << Dim]._index);
 }
 
-template<typename L, typename N, std::size_t Dim>
-typename Orthtree<L, N, Dim>::ConstNodeRange
-Orthtree<L, N, Dim>::cdescendants(
+template<
+	std::size_t Dim,
+	typename Vector,
+	typename LeafValue,
+	typename NodeValue>
+typename Orthtree<Dim, Vector, LeafValue, NodeValue>::ConstNodeRange
+Orthtree<Dim, Vector, LeafValue, NodeValue>::cdescendants(
 		ConstNodeIterator node) const {
 	return ConstNodeRange(
 		this,
@@ -319,8 +400,12 @@ Orthtree<L, N, Dim>::cdescendants(
 		node->children[1 << Dim]._index);
 }
 
-template<typename L, typename N, std::size_t Dim>
-bool Orthtree<L, N, Dim>::adjust(
+template<
+	std::size_t Dim,
+	typename Vector,
+	typename LeafValue,
+	typename NodeValue>
+bool Orthtree<Dim, Vector, LeafValue, NodeValue>::adjust(
 		ConstNodeIterator node) {
 	bool result = false;
 	// If the node doesn't have children but should, then make them.
@@ -344,14 +429,18 @@ bool Orthtree<L, N, Dim>::adjust(
 	return result;
 }
 
-template<typename L, typename N, std::size_t Dim>
+template<
+	std::size_t Dim,
+	typename Vector,
+	typename LeafValue,
+	typename NodeValue>
 std::tuple<
-		typename Orthtree<L, N, Dim>::NodeIterator,
-		typename Orthtree<L, N, Dim>::LeafIterator>
-Orthtree<L, N, Dim>::insert(
+		typename Orthtree<Dim, Vector, LeafValue, NodeValue>::NodeIterator,
+		typename Orthtree<Dim, Vector, LeafValue, NodeValue>::LeafIterator>
+Orthtree<Dim, Vector, LeafValue, NodeValue>::insert(
 		ConstNodeIterator hint,
 		L const& value,
-		Vector<Dim> const& position) {
+		Vector const& position) {
 	// Find the node with the correct position, and insert the leaf into
 	// that node.
 	NodeIterator node = find(hint, position);
@@ -367,48 +456,15 @@ Orthtree<L, N, Dim>::insert(
 	return std::make_tuple(node, insertAt(node, value, position));
 }
 
-template<typename L, typename N, std::size_t Dim>
+template<
+	std::size_t Dim,
+	typename Vector,
+	typename LeafValue,
+	typename NodeValue>
 std::tuple<
-		typename Orthtree<L, N, Dim>::NodeIterator,
-		typename Orthtree<L, N, Dim>::LeafIterator>
-Orthtree<L, N, Dim>::insert(
-		L const& value,
-		Vector<Dim> const& position) {
-	return insert(root(), value, position);
-}
-
-template<typename L, typename N, std::size_t Dim>
-template<typename LeafTuple>
-std::tuple<
-		typename Orthtree<L, N, Dim>::NodeIterator,
-		typename Orthtree<L, N, Dim>::LeafIterator>
-Orthtree<L, N, Dim>::insert(
-		ConstNodeIterator hint,
-		LeafTuple leafPair) {
-	return insert(
-		hint,
-		std::get<L>(leafPair),
-		std::get<Vector<Dim> >(leafPair));
-}
-
-template<typename L, typename N, std::size_t Dim>
-template<typename LeafTuple>
-std::tuple<
-		typename Orthtree<L, N, Dim>::NodeIterator,
-		typename Orthtree<L, N, Dim>::LeafIterator>
-Orthtree<L, N, Dim>::insert(
-		LeafTuple leafPair) {
-	return insert(
-		root(),
-		std::get<L>(leafPair),
-		std::get<Vector<Dim> >(leafPair));
-}
-
-template<typename L, typename N, std::size_t Dim>
-std::tuple<
-		typename Orthtree<L, N, Dim>::NodeIterator,
-		typename Orthtree<L, N, Dim>::LeafIterator>
-Orthtree<L, N, Dim>::erase(
+		typename Orthtree<Dim, Vector, LeafValue, NodeValue>::NodeIterator,
+		typename Orthtree<Dim, Vector, LeafValue, NodeValue>::LeafIterator>
+Orthtree<Dim, Vector, LeafValue, NodeValue>::erase(
 		ConstNodeIterator hint,
 		LeafIterator leaf) {
 	// Find the node that contains this leaf, and then erase the leaf from
@@ -428,24 +484,19 @@ Orthtree<L, N, Dim>::erase(
 	return std::make_tuple(node, eraseAt(node, leaf));
 }
 
-template<typename L, typename N, std::size_t Dim>
+template<
+	std::size_t Dim,
+	typename Vector,
+	typename LeafValue,
+	typename NodeValue>
 std::tuple<
-		typename Orthtree<L, N, Dim>::NodeIterator,
-		typename Orthtree<L, N, Dim>::LeafIterator>
-Orthtree<L, N, Dim>::erase(
-		LeafIterator leaf) {
-	return erase(root(), leaf);
-}
-
-template<typename L, typename N, std::size_t Dim>
-std::tuple<
-		typename Orthtree<L, N, Dim>::NodeIterator,
-		typename Orthtree<L, N, Dim>::NodeIterator,
-		typename Orthtree<L, N, Dim>::LeafIterator>
-Orthtree<L, N, Dim>::move(
+		typename Orthtree<Dim, Vector, LeafValue, NodeValue>::NodeIterator,
+		typename Orthtree<Dim, Vector, LeafValue, NodeValue>::NodeIterator,
+		typename Orthtree<Dim, Vector, LeafValue, NodeValue>::LeafIterator>
+Orthtree<Dim, Vector, LeafValue, NodeValue>::move(
 		ConstNodeIterator hint,
 		LeafIterator leaf,
-		Vector<Dim> const& position) {
+		Vector const& position) {
 	// Find the source node that contains the leaf, and the target node with
 	// the correct position.
 	NodeIterator source = find(hint, leaf);
@@ -475,21 +526,15 @@ Orthtree<L, N, Dim>::move(
 	return std::make_tuple(source, dest, moveAt(source, dest, leaf));
 }
 
-template<typename L, typename N, std::size_t Dim>
-std::tuple<
-		typename Orthtree<L, N, Dim>::NodeIterator,
-		typename Orthtree<L, N, Dim>::NodeIterator,
-		typename Orthtree<L, N, Dim>::LeafIterator>
-Orthtree<L, N, Dim>::move(
-		LeafIterator leaf,
-		Vector<Dim> const& position) {
-	return move(root(), leaf, position);
-}
-
-template<typename L, typename N, std::size_t Dim>
-typename Orthtree<L, N, Dim>::NodeIterator Orthtree<L, N, Dim>::find(
+template<
+	std::size_t Dim,
+	typename Vector,
+	typename LeafValue,
+	typename NodeValue>
+typename Orthtree<Dim, Vector, LeafValue, NodeValue>::NodeIterator
+Orthtree<Dim, Vector, LeafValue, NodeValue>::find(
 		ConstNodeIterator hint,
-		Vector<Dim> const& point) {
+		Vector const& point) {
 	bool containsPoint = contains(hint, point);
 	// If this node is childless and contains the point, then just return it.
 	if (containsPoint && !hint->hasChildren) {
@@ -508,8 +553,13 @@ typename Orthtree<L, N, Dim>::NodeIterator Orthtree<L, N, Dim>::find(
 	return nodes().end();
 }
 
-template<typename L, typename N, std::size_t Dim>
-typename Orthtree<L, N, Dim>::NodeIterator Orthtree<L, N, Dim>::find(
+template<
+	std::size_t Dim,
+	typename Vector,
+	typename LeafValue,
+	typename NodeValue>
+typename Orthtree<Dim, Vector, LeafValue, NodeValue>::NodeIterator
+Orthtree<Dim, Vector, LeafValue, NodeValue>::find(
 		ConstNodeIterator hint,
 		ConstLeafIterator leaf) {
 	bool containsLeaf = contains(hint, leaf);
@@ -530,13 +580,18 @@ typename Orthtree<L, N, Dim>::NodeIterator Orthtree<L, N, Dim>::find(
 	return nodes().end();
 }
 
-template<typename L, typename N, std::size_t Dim>
-typename Orthtree<L, N, Dim>::NodeIterator Orthtree<L, N, Dim>::findChild(
+template<
+	std::size_t Dim,
+	typename Vector,
+	typename LeafValue,
+	typename NodeValue>
+typename Orthtree<Dim, Vector, LeafValue, NodeValue>::NodeIterator
+Orthtree<Dim, Vector, LeafValue, NodeValue>::findChild(
 		ConstNodeIterator node,
-		Vector<Dim> const& point) {
+		Vector const& point) {
 	typename NodeList::size_type childIndex = 0;
 	for (std::size_t dim = 0; dim < Dim; ++dim) {
-		if (point[dim] >= node->position[dim] + node->dimensions[dim] / 2.0) {
+		if (node->position[dim] + node->dimensions[dim] / 2 < point[dim]) {
 			childIndex += (1 << dim);
 		}
 	}
@@ -544,8 +599,13 @@ typename Orthtree<L, N, Dim>::NodeIterator Orthtree<L, N, Dim>::findChild(
 	return NodeIterator(this, child._index);
 }
 
-template<typename L, typename N, std::size_t Dim>
-typename Orthtree<L, N, Dim>::NodeIterator Orthtree<L, N, Dim>::findChild(
+template<
+	std::size_t Dim,
+	typename Vector,
+	typename LeafValue,
+	typename NodeValue>
+typename Orthtree<Dim, Vector, LeafValue, NodeValue>::NodeIterator
+Orthtree<Dim, Vector, LeafValue, NodeValue>::findChild(
 		ConstNodeIterator node,
 		ConstLeafIterator leaf) {
 	for (
@@ -558,6 +618,8 @@ typename Orthtree<L, N, Dim>::NodeIterator Orthtree<L, N, Dim>::findChild(
 		}
 	}
 	return nodes().end();
+}
+
 }
 
 #endif

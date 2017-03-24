@@ -8,7 +8,7 @@ namespace internal {
  * \brief A function type that wraps the array subscript operator.
  */
 template<typename T>
-struct subscript {
+struct subscript final {
 	auto& operator()(T& val, auto const& index) const {
 		return val[index];
 	}
@@ -18,7 +18,7 @@ struct subscript {
 };
 
 template<>
-struct subscript<void> {
+struct subscript<void> final {
 	template<typename T>
 	auto& operator()(T& val, auto const& index) const {
 		return val[index];
