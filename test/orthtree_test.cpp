@@ -13,7 +13,6 @@
 #include <vector>
 
 #include "orthtree.h"
-#include "tensor.h"
 
 namespace bdata = boost::unit_test::data;
 using namespace nbody;
@@ -21,9 +20,10 @@ using namespace nbody;
 struct LeafValue;
 struct NodeValue;
 
-using Point = Vector<3>;
+using Scalar = double;
+using Point = std::array<Scalar, 3>;
 using LeafPair = std::tuple<LeafValue, Point>;
-using Octree = Orthtree<LeafValue, NodeValue, 3>;
+using Octree = Orthtree<3, Point, LeafValue, NodeValue>;
 
 struct LeafValue {
 	std::size_t data;
@@ -68,13 +68,14 @@ enum class CheckOrthtreeResult {
 // Takes an orthtree and a list of leaf-position pairs that should be contained
 // within it. Checks the structure of the orthtree to make sure that the leafs
 // are located at appropriate locations within the orthtree.
-template<typename LeafPair, typename L, typename N, std::size_t Dim>
+template<
+	typename LeafPair,
+	std::size_t Dim, typename Vector, typename LeafValue, typename NodeValue>
 static CheckOrthtreeResult checkOrthtree(
-		Orthtree<L, N, Dim> const& orthtree,
+		Orthtree<Dim, Vector, LeafValue, NodeValue> const& orthtree,
 		std::vector<LeafPair> allLeafPairs);
 
-template<std::size_t Dim>
-std::string to_string(Vector<Dim> const& vector);
+std::string to_string(Point const& point);
 std::string to_string(LeafValue const& leafValue);
 std::string to_string(LeafPair const& pair);
 std::string to_string(Octree const& octree);
@@ -85,10 +86,10 @@ namespace boost {
 namespace test_tools {
 namespace tt_detail {
 
-template<std::size_t Dim>
-struct print_log_value<Vector<Dim> > {
-	void operator()(std::ostream& os, Vector<Dim> const& vector) {
-		os << to_string(vector);
+template<>
+struct print_log_value<Point> {
+	void operator()(std::ostream& os, Point const& point) {
+		os << to_string(point);
 	}
 };
 template<>
@@ -247,18 +248,23 @@ BOOST_DATA_TEST_CASE(
 	}
 }
 
-template<typename LeafPair, typename L, typename N, std::size_t Dim>
+template<
+	typename LeafPair,
+	std::size_t Dim, typename Vector, typename LeafValue, typename NodeValue>
 bool compareLeafPair(
 		LeafPair pair,
-		typename Orthtree<L, N, Dim>::ConstLeafReferenceProxy leaf) {
+		typename Orthtree<Dim, Vector, LeafValue, NodeValue>::
+		ConstLeafReferenceProxy leaf) {
 	return
-		leaf.position == std::get<Vector<Dim> >(pair) &&
-		leaf.value == std::get<L>(pair);
+		leaf.position == std::get<Point>(pair) &&
+		leaf.value == std::get<LeafValue>(pair);
 }
 
-template<typename LeafPair, typename L, typename N, std::size_t Dim>
+template<
+	typename LeafPair,
+	std::size_t Dim, typename Vector, typename LeafValue, typename NodeValue>
 CheckOrthtreeResult checkOrthtree(
-		Orthtree<L, N, Dim> const& orthtree,
+		Orthtree<Dim, Vector, LeafValue, NodeValue> const& orthtree,
 		std::vector<LeafPair> allLeafPairs) {
 	// Create a stack storing the points that belong to the current node.
 	std::vector<std::vector<LeafPair> > leafPairsStack;
@@ -297,7 +303,9 @@ CheckOrthtreeResult checkOrthtree(
 				node->leafs.begin(),
 				node->leafs.end(),
 				std::bind(
-					compareLeafPair<LeafPair, L, N, Dim>,
+					compareLeafPair<
+						LeafPair,
+						Dim, Vector, LeafValue, NodeValue>,
 					leafPair,
 					std::placeholders::_1));
 			if (leaf == node->leafs.end()) {
@@ -360,7 +368,9 @@ CheckOrthtreeResult checkOrthtree(
 							child->leafs.begin(),
 							child->leafs.end(),
 							std::bind(
-								compareLeafPair<LeafPair, L, N, Dim>,
+								compareLeafPair<
+									LeafPair,
+									Dim, Vector, LeafValue, NodeValue>,
 								leafPair,
 								std::placeholders::_1));
 					});
@@ -393,15 +403,11 @@ CheckOrthtreeResult checkOrthtree(
 	return CheckOrthtreeResult::Success;
 }
 
-template<std::size_t Dim>
-std::string to_string(Vector<Dim> const& vector) {
+std::string to_string(Point const& point) {
 	std::ostringstream os;
-	os << "<";
-	if (Dim != 0) {
-		os << vector[0];
-	}
-	for (std::size_t dim = 1; dim < Dim; ++dim) {
-		os << ", " << vector[dim];
+	os << "<" << point[0];
+	for (std::size_t dim = 1; dim < point.size(); ++dim) {
+		os << ", " << point[dim];
 	}
 	os << ">";
 	return os.str();

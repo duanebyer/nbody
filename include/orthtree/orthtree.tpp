@@ -159,7 +159,7 @@ template<
 typename Orthtree<Dim, Vector, LeafValue, NodeValue>::LeafIterator
 Orthtree<Dim, Vector, LeafValue, NodeValue>::insertAt(
 		NodeIterator node,
-		L const& value,
+		LeafValue const& value,
 		Vector const& position) {
 	// Add the leaf to the master list of leaves in the orthtree.
 	_leafs.insert(
@@ -439,7 +439,7 @@ std::tuple<
 		typename Orthtree<Dim, Vector, LeafValue, NodeValue>::LeafIterator>
 Orthtree<Dim, Vector, LeafValue, NodeValue>::insert(
 		ConstNodeIterator hint,
-		L const& value,
+		LeafValue const& value,
 		Vector const& position) {
 	// Find the node with the correct position, and insert the leaf into
 	// that node.

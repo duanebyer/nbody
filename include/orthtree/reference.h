@@ -30,8 +30,8 @@ LeafReferenceProxyBase final {
 	
 private:
 	
-	template<bool Const_, bool Reverse_>
-	friend LeafIteratorBase;
+	template<typename>
+	friend class Orthtree<Dim, Vector, LeafValue, NodeValue>::LeafIteratorBase;
 	
 	using LeafReference = std::conditional_t<
 		Const,
@@ -89,8 +89,8 @@ NodeReferenceProxyBase final {
 	
 private:
 	
-	template<bool Const_, bool Reverse_>
-	friend NodeIteratorBase;
+	template<typename>
+	friend class Orthtree<Dim, Vector, LeafValue, NodeValue>::NodeIteratorBase;
 	
 	using NodeReference = std::conditional_t<
 		Const,

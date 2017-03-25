@@ -12,8 +12,9 @@ template<
 	typename Vector,
 	typename LeafValue,
 	typename NodeValue>
-template<bool Const>
-struct Orthtree<Dim, Vector, LeafValue, NodeValue>::LeafIteratorBase<Const>::
+template<bool Const, bool Reverse>
+struct Orthtree<Dim, Vector, LeafValue, NodeValue>::
+LeafIteratorBase<Const, Reverse>::
 PointerProxy final {
 	
 	ReferenceProxy reference;
@@ -33,9 +34,12 @@ template<
 	typename Vector,
 	typename LeafValue,
 	typename NodeValue>
-template<bool Const>
-Orthtree<Dim, Vector, LeafValue, NodeValue>::LeafIteratorBase<Const>::reference
-Orthtree<Dim, Vector, LeafValue, NodeValue>::LeafIteratorBase<Const>::
+template<bool Const, bool Reverse>
+
+typename Orthtree<Dim, Vector, LeafValue, NodeValue>::
+template LeafIteratorBase<Const, Reverse>::reference
+
+Orthtree<Dim, Vector, LeafValue, NodeValue>::LeafIteratorBase<Const, Reverse>::
 operator*() const {
 	return LeafReferenceProxyBase<Const>(
 		_orthtree->_leafs[_index].position,
@@ -47,9 +51,12 @@ template<
 	typename Vector,
 	typename LeafValue,
 	typename NodeValue>
-template<bool Const>
-Orthtree<Dim, Vector, LeafValue, NodeValue>::LeafIteratorBase<Const>::pointer
-Orthtree<Dim, Vector, LeafValue, NodeValue>::LeafIteratorBase<Const>::
+template<bool Const, bool Reverse>
+
+typename Orthtree<Dim, Vector, LeafValue, NodeValue>::
+template LeafIteratorBase<Const, Reverse>::pointer
+
+Orthtree<Dim, Vector, LeafValue, NodeValue>::LeafIteratorBase<Const, Reverse>::
 operator->() const {
 	return PointerProxy(operator*());
 }
@@ -61,8 +68,9 @@ template<
 	typename Vector,
 	typename LeafValue,
 	typename NodeValue>
-template<bool Const>
-struct Orthtree<Dim, Vector, LeafValue, NodeValue>::NodeIteratorBase<Const>::
+template<bool Const, bool Reverse>
+struct Orthtree<Dim, Vector, LeafValue, NodeValue>::
+NodeIteratorBase<Const, Reverse>::
 PointerProxy final {
 	
 	ReferenceProxy reference;
@@ -82,9 +90,13 @@ template<
 	typename Vector,
 	typename LeafValue,
 	typename NodeValue>
-template<bool Const>
-Orthtree<Dim, Vector, LeafValue, NodeValue>::NodeIteratorBase<Const>::reference
-Orthtree<Dim, Vector, LeafValue, NodeValue>::NodeIteratorBase<Const>::
+template<bool Const, bool Reverse>
+
+typename Orthtree<Dim, Vector, LeafValue, NodeValue>::
+template NodeIteratorBase<Const, Reverse>::reference
+
+Orthtree<Dim, Vector, LeafValue, NodeValue>::
+NodeIteratorBase<Const, Reverse>::
 operator*() const {
 	NodeIteratorBase<Const, false> parent(
 		_orthtree,
@@ -121,9 +133,13 @@ template<
 	typename Vector,
 	typename LeafValue,
 	typename NodeValue>
-template<bool Const>
-Orthtree<Dim, Vector, LeafValue, NodeValue>::NodeIteratorBase<Const>::pointer
-Orthtree<Dim, Vector, LeafValue, NodeValue>::NodeIteratorBase<Const>::
+template<bool Const, bool Reverse>
+
+typename Orthtree<Dim, Vector, LeafValue, NodeValue>::
+template NodeIteratorBase<Const, Reverse>::pointer
+
+Orthtree<Dim, Vector, LeafValue, NodeValue>::
+NodeIteratorBase<Const, Reverse>::
 operator->() const {
 	return PointerProxy(operator*());
 }

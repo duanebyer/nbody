@@ -48,61 +48,65 @@ public:
 	
 	// Make sure that the template parameters meet all of the conditions.
 	
+	using Scalar = std::remove_reference_t<decltype(std::declval<Vector>()[0])>;
+	
 	static_assert(
 		Dim > 0,
 		"template parameter Dim must be larger than 0");
 	
 	static_assert(
-		std::is_default_constructible<NodeValue>(),
+		std::is_default_constructible<NodeValue>::value,
 		"template parameter NodeValue must be default constructible");
 	static_assert(
-		std::is_copy_assignable<NodeValue>(),
+		std::is_copy_assignable<NodeValue>::value,
 		"template parameter NodeValue must be copy assignable");
 	static_assert(
-		std::is_copy_constructible<NodeValue>(),
+		std::is_copy_constructible<NodeValue>::value,
 		"template parameter NodeValue must be copy constructible");
 	
 	static_assert(
-		std::is_copy_assignable<LeafValue>(),
+		std::is_copy_assignable<LeafValue>::value,
 		"template parameter LeafValue must be copy assignable");
 	static_assert(
-		std::is_copy_constructible<LeafValue>(),
+		std::is_copy_constructible<LeafValue>::value,
 		"template parameter LeafValue must be copy constructible");
 	
 	static_assert(
-		std::is_copy_constructible<Vector>(),
+		std::is_copy_constructible<Vector>::value,
 		"template parameter Vector must be copy constructible");
 	static_assert(
 		nbody::internal::is_invocable<
-			nbody::internal::subscript<Vector>(), std::size_t>(),
+			nbody::internal::subscript<Vector>,
+			Vector,
+			std::size_t>::value,
 		"template parameter Vector must have operator[]");
 	static_assert(
 		nbody::internal::is_invocable_r<
-			Scalar&, nbody::internal::subscript<Vector>(), std::size_t>(),
+			Scalar&, nbody::internal::subscript<Vector>,
+			Vector,
+			std::size_t>::value,
 		"template parameter Vector must have operator[]");
 	
 	static_assert(
 		nbody::internal::is_invocable_r<
-			Scalar, std::plus<Scalar>(), Scalar, Scalar>(),
+			Scalar, std::plus<Scalar>, Scalar, Scalar>::value,
 		"template parameter Vector's scalar type must have operator+");
 	static_assert(
 		nbody::internal::is_invocable_r<
-			Scalar, std::minus<Scalar>(), Scalar, Scalar>(),
+			Scalar, std::minus<Scalar>, Scalar, Scalar>::value,
 		"template parameter Vector's scalar type must have operator-");
 	static_assert(
 		nbody::internal::is_invocable_r<
-			Scalar, std::multiplies<Scalar>(), Scalar, Scalar>(),
+			Scalar, std::multiplies<Scalar>, Scalar, Scalar>::value,
 		"template parameter Vector's scalar type must have operator*");
 	static_assert(
 		nbody::internal::is_invocable_r<
-			Scalar, std::multiplies<Scalar>(), Scalar, Scalar>(),
+			Scalar, std::multiplies<Scalar>, Scalar, Scalar>::value,
 		"template parameter Vector's scalar type must have operator/");
 	static_assert(
 		nbody::internal::is_invocable_r<
-			Scalar, std::less<Scalar>(), Scalar, Scalar>(),
+			Scalar, std::less<Scalar>, Scalar, Scalar>::value,
 		"template parameter Vector's scalar type must have operator<");
-	
-	using Scalar = decltype(std::declval<Vector>()[0]);
 	
 	// These classes are used as proxies for accessing the nodes and leafs of
 	// the orthtree.
@@ -579,7 +583,8 @@ public:
 	ConstNodeIterator find(
 			ConstNodeIterator start,
 			Vector const& point) const {
-		return const_cast<Orthtree<L, N, Dim>*>(this)->find(start, point);
+		return const_cast<std::remove_const_t<decltype(*this)*> >(this)->
+			find(start, point);
 	}
 	
 	ConstNodeIterator find(
@@ -614,7 +619,7 @@ public:
 	ConstNodeIterator find(
 			ConstNodeIterator hint,
 			ConstLeafIterator leaf) const {
-		return const_cast<std::remove_const_t<decltype(this)>*>(this)->
+		return const_cast<std::remove_const_t<decltype(*this)*> >(this)->
 			find(hint, leaf);
 	}
 	
@@ -645,7 +650,7 @@ public:
 	ConstNodeIterator findChild(
 			ConstNodeIterator node,
 			Vector const& point) const {
-		return const_cast<std::remove_const_t<decltype(this)>*>(this)->
+		return const_cast<std::remove_const_t<decltype(*this)*> >(this)->
 			findChild(node, point);
 	}
 	///@}
@@ -666,7 +671,7 @@ public:
 	ConstNodeIterator findChild(
 			ConstNodeIterator node,
 			ConstLeafIterator leaf) const {
-		return const_cast<std::remove_const_t<decltype(this)*>(this)->
+		return const_cast<std::remove_const_t<decltype(*this)*> >(this)->
 			findChild(node, leaf);
 	}
 	///@}

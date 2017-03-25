@@ -33,8 +33,8 @@ private:
 	
 	friend Orthtree<Dim, Vector, LeafValue, NodeValue>;
 	
-	template<bool Const_>
-	friend LeafRangeBase;
+	template<typename>
+	friend class Orthtree<Dim, Vector, LeafValue, NodeValue>::LeafRangeBase;
 	
 	using ReferenceProxy = LeafReferenceProxyBase<Const>;
 	using List = LeafList;
@@ -169,8 +169,8 @@ private:
 	
 	friend Orthtree<Dim, Vector, LeafValue, NodeValue>;
 	
-	template<bool Const_>
-	friend NodeRangeBase;
+	template<typename>
+	friend class Orthtree<Dim, Vector, LeafValue, NodeValue>::NodeRangeBase;
 	
 	using ReferenceProxy = NodeReferenceProxyBase<Const>;
 	using List = NodeList;

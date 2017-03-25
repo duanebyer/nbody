@@ -33,8 +33,8 @@ private:
 	
 	friend Orthtree<Dim, Vector, LeafValue, NodeValue>;
 	
-	template<bool Const_, bool Reverse_>
-	friend NodeIteratorBase;
+	template<typename>
+	friend class Orthtree<Dim, Vector, LeafValue, NodeValue>::NodeIteratorBase;
 	
 	using OrthtreePointer = std::conditional_t<
 			Const,
@@ -164,8 +164,8 @@ private:
 	
 	using OrthtreePointer = std::conditional_t<
 			Const,
-			Orthtree<L, N, Dim> const*,
-			Orthtree<L, N, Dim>*>;
+			Orthtree<Dim, Vector, LeafValue, NodeValue> const*,
+			Orthtree<Dim, Vector, LeafValue, NodeValue>*>;
 	
 	OrthtreePointer _orthtree;
 	typename NodeIterator::size_type _lowerIndex;

@@ -14,7 +14,7 @@ template<
 	typename = std::enable_if_t<
 		std::is_convertible<
 			decltype(std::declval<F>()(std::declval<Args>()...)),
-			Result>()
+			Result>::value
 	> >
 std::true_type is_invocable_r_test(Result, F, Args...);
 std::false_type is_invocable_r_test(...);
@@ -39,7 +39,7 @@ struct is_invocable final : decltype(is_invocable_test(
 };
 
 template<typename F, typename... Args>
-using is_invocable_v = is_invocable<F, Args...>::value;
+constexpr bool is_invocable_v = is_invocable<F, Args...>::value;
 
 /**
  * \brief This type mimics the C++17 type `std::is_invocable_r`.
@@ -55,7 +55,7 @@ struct is_invocable_r final : decltype(is_invocable_r_test(
 };
 
 template<typename Result, typename F, typename... Args>
-using is_invocable_r_v = is_invocable_r<Result, F, Args...>::value;
+constexpr bool is_invocable_r_v = is_invocable_r<Result, F, Args...>::value;
 
 }
 }
