@@ -98,8 +98,9 @@ Orthtree<Dim, Vector, LeafValue, NodeValue>::createChildren(
 			typename LeafList::size_type index = 0;
 			index < node->leafs.size();
 			++index) {
-		// Figure out which node the leaf belongs to.
 		typename NodeList::size_type childIndex = 0;
+		// The leaf is always taken from the front of the list, and moved to
+		// a location on the end of the list.
 		LeafIterator leaf = node->leafs.begin();
 		Vector const& position = leaf->position;
 		for (std::size_t dim = 0; dim < Dim; ++dim) {
@@ -228,12 +229,13 @@ Orthtree<Dim, Vector, LeafValue, NodeValue>::moveAt(
 		NodeIterator sourceNode,
 		NodeIterator destNode,
 		LeafIterator sourceLeaf) {
-	// Reinsert the leaf into the leaf vector in its new position.
+	// Determine the relative ordering of the source/destination leafs.
 	LeafIterator destLeaf = destNode->leafs.end(); --destLeaf;
-	bool inverted = sourceLeaf.internalIt() > destLeaf.internalIt();
+	bool inverted = sourceLeaf._index > destLeaf._index;
 	LeafIterator firstLeaf = inverted ? destLeaf : sourceLeaf;
 	LeafIterator lastLeaf = inverted ? sourceLeaf : destLeaf;
 	
+	// Move the leaf from its old position to its new position.
 	std::rotate(
 		firstLeaf.internalIt() + inverted,
 		sourceLeaf.internalIt() + !inverted,
@@ -258,11 +260,13 @@ Orthtree<Dim, Vector, LeafValue, NodeValue>::moveAt(
 	// destination.
 	
 	// Adjust the nodes in between the source and destination node.
-	std::ptrdiff_t invertedSign = inverted ? -1 : +1;
-	NodeIterator begin = sourceNode; ++begin;
-	NodeIterator end = destNode;
-	for (NodeIterator node = begin; node != end; ++node) {
-		node.internalIt()->leafIndex -= invertedSign;
+	signed char indexOffset = inverted ? +1 : -1;
+	NodeIterator firstNode = inverted ? destNode : sourceNode;
+	NodeIterator lastNode = inverted ? sourceNode : destNode;
+	++firstNode;
+	++lastNode;
+	for (NodeIterator node = firstNode; node != lastNode; ++node) {
+		node.internalIt()->leafIndex += indexOffset;
 	}
 	
 	return destLeaf;
@@ -535,22 +539,25 @@ typename Orthtree<Dim, Vector, LeafValue, NodeValue>::NodeIterator
 Orthtree<Dim, Vector, LeafValue, NodeValue>::find(
 		ConstNodeIterator hint,
 		Vector const& point) {
-	bool containsPoint = contains(hint, point);
-	// If this node is childless and contains the point, then just return it.
-	if (containsPoint && !hint->hasChildren) {
-		return NodeIterator(this, hint._index);
+	// If the hint node doesn't contain the point, then go up the tree until we
+	// reach a node that does contain the point.
+	NodeIterator node(this, hint._index);
+	while (!contains(node, point)) {
+		if (node->hasParent) {
+			node = node->parent;
+		}
+		else {
+			return nodes().end();
+		}
 	}
-	// If it is childless but contains the point, then recursively call this
-	// method on the child that also conains the point.
-	else if (containsPoint && hint->hasChildren) {
-		return find(findChild(hint, point), point);
+	
+	// Then, go down the tree until we reach the deepest node that contains the
+	// point.
+	while (node->hasChildren) {
+		node = findChild(node, point);
 	}
-	// If it does not contain the point, then recursively call this method on
-	// the parent of this node.
-	else if (hint->hasParent) {
-		return find(hint->parent, point);
-	}
-	return nodes().end();
+	
+	return node;
 }
 
 template<
@@ -562,22 +569,25 @@ typename Orthtree<Dim, Vector, LeafValue, NodeValue>::NodeIterator
 Orthtree<Dim, Vector, LeafValue, NodeValue>::find(
 		ConstNodeIterator hint,
 		ConstLeafIterator leaf) {
-	bool containsLeaf = contains(hint, leaf);
-	// If this node is childless and contains the leaf, then return itself.
-	if (containsLeaf && !hint->hasChildren) {
-		return NodeIterator(this, hint._index);
+	// If the hint node doesn't contain the leaf, then go up the tree until we
+	// reach a node that does contain the leaf.
+	NodeIterator node(this, hint._index);
+	while (!contains(node, leaf)) {
+		if (node->hasParent) {
+			node = node->parent;
+		}
+		else {
+			return nodes().end();
+		}
 	}
-	// If it has children and contains the leaf, then recursively call this
-	// method on the child that contains the leaf.
-	else if (containsLeaf && hint->hasChildren) {
-		return find(findChild(hint, leaf), leaf);
+	
+	// Then go down the tree until we reach the deepest node that contains the
+	// point.
+	while (node->hasChildren) {
+		node = findChild(node, leaf);
 	}
-	// If it doesn't contain the leaf, the recursively call this method on the
-	// parent of this node.
-	else if (hint->hasParent) {
-		return find(hint->parent, leaf);
-	}
-	return nodes().end();
+	
+	return node;
 }
 
 template<
@@ -591,7 +601,7 @@ Orthtree<Dim, Vector, LeafValue, NodeValue>::findChild(
 		Vector const& point) {
 	typename NodeList::size_type childIndex = 0;
 	for (std::size_t dim = 0; dim < Dim; ++dim) {
-		if (node->position[dim] + node->dimensions[dim] / 2 < point[dim]) {
+		if (point[dim] >= node->position[dim] + node->dimensions[dim] / 2) {
 			childIndex += (1 << dim);
 		}
 	}
@@ -618,6 +628,39 @@ Orthtree<Dim, Vector, LeafValue, NodeValue>::findChild(
 		}
 	}
 	return nodes().end();
+}
+
+template<
+	std::size_t Dim,
+	typename Vector,
+	typename LeafValue,
+	typename NodeValue>
+bool Orthtree<Dim, Vector, LeafValue, NodeValue>::contains(
+		ConstNodeIterator node,
+		Vector const& point) const {
+	for (std::size_t dim = 0; dim < Dim; ++dim) {
+		Scalar lower = node->position[dim];
+		Scalar upper = lower + node->dimensions[dim];
+		if (!(point[dim] >= lower && point[dim] < upper)) {
+			return false;
+		}
+	}
+	return true;
+}
+
+template<
+	std::size_t Dim,
+	typename Vector,
+	typename LeafValue,
+	typename NodeValue>
+bool Orthtree<Dim, Vector, LeafValue, NodeValue>::contains(
+		ConstNodeIterator node,
+		ConstLeafIterator leaf) const {
+	using Index = typename LeafList::size_type;
+	Index leafIndex = (Index) leaf._index;
+	Index lower = node.internalIt()->leafIndex;
+	Index upper = lower + node.internalIt()->leafCount;
+	return leafIndex >= lower && leafIndex < upper;
 }
 
 }

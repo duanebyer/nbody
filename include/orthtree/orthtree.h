@@ -107,6 +107,10 @@ public:
 		nbody::internal::is_invocable_r<
 			Scalar, std::less<Scalar>, Scalar, Scalar>::value,
 		"template parameter Vector's scalar type must have operator<");
+	static_assert(
+		nbody::internal::is_invocable_r<
+			Scalar, std::greater_equal<Scalar>, Scalar, Scalar>::value,
+		"template parameter Vector's scalar type must have operator>=");
 	
 	// These classes are used as proxies for accessing the nodes and leafs of
 	// the orthtree.
@@ -679,29 +683,12 @@ public:
 	/**
 	 * \brief Determines whether a node contains a point.
 	 */
-	bool contains(ConstNodeIterator node, Vector const& point) const {
-		for (std::size_t dim = 0; dim < Dim; ++dim) {
-			if (!(
-					node->position[dim] < point[dim] &&
-					point[dim] < node->position[dim] + node->dimensions[dim])) {
-				return false;
-			}
-		}
-		return true;
-	}
+	bool contains(ConstNodeIterator node, Vector const& point) const;
 	
 	/**
 	 * \brief Determines whether a node contains a leaf.
 	 */
-	bool contains(ConstNodeIterator node, ConstLeafIterator leaf) const {
-		typename LeafList::difference_type index =
-			(typename LeafList::difference_type) node.internalIt()->leafIndex;
-		typename LeafList::difference_type count =
-			(typename LeafList::difference_type) node.internalIt()->leafCount;
-		return
-			leaf._index >= index &&
-			leaf._index < index + count;
-	}
+	bool contains(ConstNodeIterator node, ConstLeafIterator leaf) const;
 	
 };
 
