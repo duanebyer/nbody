@@ -102,15 +102,8 @@ Orthtree<Dim, Vector, LeafValue, NodeValue>::createChildren(
 		// The leaf is always taken from the front of the list, and moved to
 		// a location on the end of the list.
 		LeafIterator leaf = node->leafs.begin();
-		Vector const& position = leaf->position;
-		for (std::size_t dim = 0; dim < Dim; ++dim) {
-			if (
-					node->position[dim] + node->dimensions[dim] / 2 <
-					position[dim]) {
-				childIndex += (1 << dim);
-			}
-		}
-		moveAt(node, node->children[childIndex], leaf);
+		NodeIterator child = findChild(node, leaf->position);
+		moveAt(node, child, leaf);
 	}
 	
 	return node;
