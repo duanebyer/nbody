@@ -314,11 +314,11 @@ CheckOrthtreeResult checkOrthtree(
 			// Then, make sure that it is contained within the bounds of the
 			// node.
 			for (std::size_t dim = 0; dim < Dim; ++dim) {
-				Scalar lower = node->position[dim];
-				Scalar upper = lower + node->dimensions[dim];
+				Scalar position = node->position[dim];
+				Scalar dimensions = node->dimensions[dim];
 				if (!(
-						leaf->position[dim] >= lower &&
-						leaf->position[dim] < upper)) {
+						leaf->position[dim] >= position &&
+						leaf->position[dim] - position < dimensions)) {
 					return CheckOrthtreeResult::LeafOutOfBounds;
 				}
 			}

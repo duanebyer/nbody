@@ -594,7 +594,7 @@ Orthtree<Dim, Vector, LeafValue, NodeValue>::findChild(
 		Vector const& point) {
 	typename NodeList::size_type childIndex = 0;
 	for (std::size_t dim = 0; dim < Dim; ++dim) {
-		if (point[dim] >= node->position[dim] + node->dimensions[dim] / 2) {
+		if (point[dim] - node->position[dim] >= node->dimensions[dim] / 2) {
 			childIndex += (1 << dim);
 		}
 	}
@@ -634,7 +634,9 @@ bool Orthtree<Dim, Vector, LeafValue, NodeValue>::contains(
 	for (std::size_t dim = 0; dim < Dim; ++dim) {
 		Scalar lower = node->position[dim];
 		Scalar upper = lower + node->dimensions[dim];
-		if (!(point[dim] >= lower && point[dim] < upper)) {
+		if (!(
+				point[dim] >= node->position[dim] &&
+				point[dim] - node->position[dim] < node->dimensions[dim])) {
 			return false;
 		}
 	}
