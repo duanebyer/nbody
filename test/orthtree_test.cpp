@@ -52,7 +52,7 @@ struct NodeValue {
 enum class CheckOrthtreeResult {
 	Success,
 	RootHasParent,
-	LeafDuplicate,
+	LeafExtra,
 	LeafMissing,
 	DepthIncorrect,
 	LeafOutOfBounds,
@@ -291,10 +291,10 @@ CheckOrthtreeResult checkOrthtree(
 		leafPairsStack.pop_back();
 		
 		if (leafPairs.size() > node->leafs.size()) {
-			return CheckOrthtreeResult::LeafDuplicate;
+			return CheckOrthtreeResult::LeafMissing;
 		}
 		if (leafPairs.size() < node->leafs.size()) {
-			return CheckOrthtreeResult::LeafMissing;
+			return CheckOrthtreeResult::LeafExtra;
 		}
 		
 		for (auto leafPair : leafPairs) {
@@ -450,8 +450,8 @@ std::string to_string(CheckOrthtreeResult check) {
 	case CheckOrthtreeResult::RootHasParent:
 		error = "root node has parent";
 		break;
-	case CheckOrthtreeResult::LeafDuplicate:
-		error = "node contains duplicate leafs";
+	case CheckOrthtreeResult::LeafExtra:
+		error = "node contains extra leafs";
 		break;
 	case CheckOrthtreeResult::LeafMissing:
 		error = "node is missing leaf";
