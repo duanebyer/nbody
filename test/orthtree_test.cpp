@@ -20,10 +20,11 @@ using namespace nbody;
 struct LeafValue;
 struct NodeValue;
 
+static std::size_t const Dimension = 3;
 using Scalar = double;
-using Point = std::array<Scalar, 3>;
+using Point = std::array<Scalar, Dimension>;
 using LeafPair = std::tuple<LeafValue, Point>;
-using Octree = Orthtree<3, Point, LeafValue, NodeValue>;
+using Octree = Orthtree<Dimension, Point, LeafValue, NodeValue>;
 
 struct LeafValue {
 	std::size_t data;
@@ -136,6 +137,17 @@ struct print_log_value<std::vector<T> > {
 }
 }
 
+template<
+	typename LeafPair,
+	std::size_t Dim, typename Vector, typename LeafValue, typename NodeValue>
+bool compareLeafPair(
+		LeafPair pair,
+		typename Orthtree<Dim, Vector, LeafValue, NodeValue>::Leaf leaf) {
+	return
+		leaf.position == std::get<Point>(pair) &&
+		leaf.value == std::get<LeafValue>(pair);
+}
+
 // A collection of different octrees with various parameters.
 static auto const octreeData =
 	bdata::make(Octree({0.0, 0.0, 0.0}, {16.0, 16.0, 16.0}, 3, 4)) +
@@ -210,16 +222,18 @@ static auto const leafPairsData = bdata::make(
 static auto const singleLeafPairData = bdata::make([]() {
 	std::vector<LeafPair> result;
 	std::size_t index = 0;
-	for (Scalar x = 0.0; x <= 16.0; x += 1.0) {
-		for (Scalar y = 0.0; y <= 16.0; y += 1.0) {
-			for (Scalar z = 0.0; z <= 16.0; z += 1.0) {
+	for (Scalar x = 0.0; x < 16.0; x += 4.0) {
+		for (Scalar y = 0.0; y < 16.0; y += 4.0) {
+			for (Scalar z = 0.0; z < 16.0; z += 4.0) {
 				result.push_back(LeafPair {LeafValue(index), {x, y, z}});
 			}
 		}
 	}
+	result.push_back(LeafPair {LeafValue(314), {3.14, 3.14, 6.28}});
 	return result;
 }());
 
+// A list of leafs, without positions.
 static auto const singleLeafData = bdata::make([]() {
 	std::vector<LeafValue> result;
 	for (int data = -1; data < 30; ++data) {
@@ -248,16 +262,88 @@ BOOST_DATA_TEST_CASE(
 	}
 }
 
-template<
-	typename LeafPair,
-	std::size_t Dim, typename Vector, typename LeafValue, typename NodeValue>
-bool compareLeafPair(
-		LeafPair pair,
-		typename Orthtree<Dim, Vector, LeafValue, NodeValue>::
-		ConstLeafReferenceProxy leaf) {
-	return
-		leaf.position == std::get<Point>(pair) &&
-		leaf.value == std::get<LeafValue>(pair);
+// Adds a single point to an orthtree.
+BOOST_DATA_TEST_CASE(
+		OrthtreeInsertTest,
+		octreeData * leafPairsData * singleLeafPairData,
+		emptyOctree,
+		initialLeafPairs,
+		insertValue,
+		insertPosition) {
+	// Construct an orthtree that contains all of the initial points.
+	Octree octree = emptyOctree;
+	std::vector<LeafPair> leafPairs = initialLeafPairs;
+	LeafPair insertLeafPair {insertValue, insertPosition};
+	
+	BOOST_TEST_CHECKPOINT("preparing to construct orthtree");
+	for (auto it = leafPairs.begin(); it != leafPairs.end(); ++it) {
+		octree.insert(*it);
+	}
+	BOOST_TEST_CHECKPOINT("finished constructing orthtree");
+	
+	// Check the validity of the orthtree, add a single point, and then check
+	// the validity again.
+	CheckOrthtreeResult check = checkOrthtree(octree, leafPairs);
+	BOOST_REQUIRE_EQUAL(check, CheckOrthtreeResult::Success);
+	
+	BOOST_TEST_CHECKPOINT("preparing to add " + to_string(insertLeafPair));
+	octree.insert(insertLeafPair);
+	leafPairs.push_back(insertLeafPair);
+	BOOST_TEST_CHECKPOINT("finished adding " + to_string(insertLeafPair));
+	
+	check = checkOrthtree(octree, leafPairs);
+	BOOST_REQUIRE_EQUAL(check, CheckOrthtreeResult::Success);
+}
+
+// Remove a single point from an octree.
+BOOST_DATA_TEST_CASE(
+		OrthtreeEraseTest,
+		octreeData * leafPairsData * singleLeafData,
+		emptyOctree,
+		initialLeafPairs,
+		eraseValue) {
+	// Construct an orthtree that contains all of the initial points.
+	Octree octree = emptyOctree;
+	std::vector<LeafPair> leafPairs = initialLeafPairs;
+	
+	BOOST_TEST_CHECKPOINT("preparing to construct orthtree");
+	for (auto it = leafPairs.begin(); it != leafPairs.end(); ++it) {
+		octree.insert(*it);
+	}
+	BOOST_TEST_CHECKPOINT("finished constructing orthtree");
+	
+	// Check the validity of the orthtree, remove a single point, and then check
+	// the validity again.
+	CheckOrthtreeResult check = checkOrthtree(octree, leafPairs);
+	BOOST_REQUIRE_EQUAL(check, CheckOrthtreeResult::Success);
+	
+	BOOST_TEST_CHECKPOINT("preparing to remove " + to_string(eraseValue));
+	// First look for the leaf in the leafPairs list. If it is there, then
+	// it should also be in the orthtree.
+	auto leafIt = std::find_if(
+		leafPairs.begin(),
+		leafPairs.end(),
+		[eraseValue](LeafPair pair) {
+			return std::get<LeafValue>(pair) == eraseValue;
+		}
+	);
+	if (leafIt != leafPairs.end()) {
+		auto octreeLeafIt = std::find_if(
+			octree.leafs().begin(),
+			octree.leafs().end(),
+			std::bind(
+				compareLeafPair<
+					LeafPair,
+					Dimension, Point, LeafValue, NodeValue>,
+				*leafIt,
+				std::placeholders::_1));
+		octree.erase(octreeLeafIt);
+		leafPairs.erase(leafIt);
+	}
+	BOOST_TEST_CHECKPOINT("finished removing " + to_string(eraseValue));
+	
+	check = checkOrthtree(octree, leafPairs);
+	BOOST_REQUIRE_EQUAL(check, CheckOrthtreeResult::Success);
 }
 
 template<
