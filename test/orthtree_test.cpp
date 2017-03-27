@@ -145,7 +145,7 @@ static auto const octreeData =
 	bdata::make(Octree({0.0, 0.0, 0.0}, {16.0, 16.0, 16.0}, 1, 64)) +
 	bdata::make(Octree({0.0, 0.0, 0.0}, {16.0, 16.0, 16.0}, 64, 4)) +
 	bdata::make(Octree({0.0, 0.0, 0.0}, {16.0, 16.0, 16.0}, 64, 0)) +
-	bdata::make(Octree({-48.0, -32.0, 8.0}, {+64.0, +128.0, 4.0}, 3, 4));
+	bdata::make(Octree({-48.0, -32.0, -8.0}, {+64.0, +128.0, +24.0}, 3, 4));
 
 // A set of leaf pair lists that can be used to construct octrees.
 static auto const leafPairsData = bdata::make(
