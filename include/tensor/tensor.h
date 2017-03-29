@@ -8,12 +8,7 @@
 
 namespace nbody {
 
-/**
- * \brief The floating point type used to represent scalars.
- */
-using Scalar = double;
-
-template<std::size_t N, std::size_t M, std::size_t Dim>
+template<std::size_t N, std::size_t M, std::size_t Dim, typename Scalar>
 class Tensor;
 
 /**
@@ -22,9 +17,10 @@ class Tensor;
  * A Vector can also be thought of as a (0, 1) Tensor.
  * 
  * \tparam Dim the dimension of the vector space
+ * \tparam Scalar the underlying floating point scalar type
  */
-template<std::size_t Dim>
-using Vector = Tensor<0, 1, Dim>;
+template<std::size_t Dim, typename Scalar = double>
+using Vector = Tensor<0, 1, Dim, Scalar>;
 
 /**
  * \brief A covector in a finite dimensional dual space.
@@ -33,9 +29,10 @@ using Vector = Tensor<0, 1, Dim>;
  * or alternatively, as a (1, 0) Tensor.
  * 
  * \tparam Dim the dimension of the dual space
+ * \tparam Scalar the underlying floating point scalar type
  */
-template<std::size_t Dim>
-using Covector = Tensor<1, 0, Dim>;
+template<std::size_t Dim, typename Scalar = double>
+using Covector = Tensor<1, 0, Dim, Scalar>;
 
 /**
  * \brief A rank (N, M) tensor in a finite dimensional space.
@@ -52,15 +49,21 @@ using Covector = Tensor<1, 0, Dim>;
  * \tparam N the number of contravariant (upper) indices
  * \tparam M the number of covariant (lower) indices
  * \tparam Dim the dimension of the underlying vector space
+ * \tparam Scalar the underlying floating point scalar type
  */
-template<std::size_t N, std::size_t M, std::size_t Dim>
+template<
+	std::size_t N,
+	std::size_t M,
+	std::size_t Dim,
+	typename Scalar = double>
 class Tensor final {
 	
 private:
 	
-	using PrevTensor = std::conditional_t<N == 0,
-	                                      Tensor<N, M - 1, Dim>,
-	                                      Tensor<N - 1, M, Dim> >;
+	using PrevTensor = std::conditional_t<
+		N == 0,
+		Tensor<N, M - 1, Dim>,
+		Tensor<N - 1, M, Dim> >;
 	
 	PrevTensor _values[Dim];
 	
@@ -72,6 +75,9 @@ public:
 	 */
 	using Array = typename PrevTensor::Array[Dim];
 	
+	/**
+	 * \brief The number of coordinate values stored in this Tensor.
+	 */
 	static const std::size_t size = Dim * PrevTensor::size;
 	
 	/**
@@ -169,8 +175,8 @@ public:
  * that two rank zero Tensor%s with different dimensions are not considered
  * the same type.
  */
-template<std::size_t Dim>
-class Tensor<0, 0, Dim> final {
+template<std::size_t Dim, typename Scalar>
+class Tensor<0, 0, Dim, Scalar> final {
 	
 private:
 	
@@ -209,8 +215,8 @@ public:
  * The identity matrix is a (1, 1) Tensor that takes a Vector and a Covector
  * and returns the sum of the component-wise products.
  */
-template<std::size_t Dim>
-Tensor<1, 1, Dim> const& identity() {
+template<std::size_t Dim, typename Scalar = double>
+Tensor<1, 1, Dim, Scalar> const& identity() {
 	static Tensor<1, 1, Dim> identity;
 	if (identity[0][0] == 0.0) {
 		for (std::size_t index = 0; index < Dim; ++index) {
@@ -220,8 +226,10 @@ Tensor<1, 1, Dim> const& identity() {
 	return identity;
 }
 
-template<std::size_t N, std::size_t M, std::size_t Dim>
-bool operator==(Tensor<N, M, Dim> const& lhs, Tensor<N, M, Dim> const& rhs) {
+template<std::size_t N, std::size_t M, std::size_t Dim, typename Scalar>
+bool operator==(
+		Tensor<N, M, Dim, Scalar> const& lhs,
+		Tensor<N, M, Dim, Scalar> const& rhs) {
 	bool result = true;
 	for (std::size_t index = 0; index < Dim; ++index) {
 		result = result && (lhs[index] == rhs[index]);
@@ -229,97 +237,117 @@ bool operator==(Tensor<N, M, Dim> const& lhs, Tensor<N, M, Dim> const& rhs) {
 	return result;
 }
 
-template<std::size_t Dim>
-bool operator==(Tensor<0, 0, Dim> const& lhs, Tensor<0, 0, Dim> const& rhs) {
+template<std::size_t Dim, typename Scalar>
+bool operator==(
+		Tensor<0, 0, Dim, Scalar> const& lhs,
+		Tensor<0, 0, Dim, Scalar> const& rhs) {
 	return (Scalar) lhs == (Scalar) rhs;
 }
 
-template<std::size_t N, std::size_t M, std::size_t Dim>
-bool operator!=(Tensor<N, M, Dim> const& lhs, Tensor<N, M, Dim> const& rhs) {
+template<std::size_t N, std::size_t M, std::size_t Dim, typename Scalar>
+bool operator!=(
+		Tensor<N, M, Dim, Scalar> const& lhs,
+		Tensor<N, M, Dim> const& rhs) {
 	return !operator==(lhs, rhs);
 }
 
 /**
  * \brief Returns the tensor product of two Tensor%s.
  */
-template<std::size_t N1, std::size_t M1,
-         std::size_t N2, std::size_t M2,
-         std::size_t Dim>
-Tensor<N1 + N2, M1 + M2, Dim> operator*(Tensor<N1, M1, Dim> const& lhs,
-                                        Tensor<N2, M2, Dim> const& rhs) {
+template<
+	std::size_t N1, std::size_t M1,
+	std::size_t N2, std::size_t M2,
+	std::size_t Dim,
+	typename Scalar>
+Tensor<N1 + N2, M1 + M2, Dim, Scalar> operator*(
+		Tensor<N1, M1, Dim, Scalar> const& lhs,
+		Tensor<N2, M2, Dim, Scalar> const& rhs) {
 	// First case: both tensors have contravariant indices, so we must take the
 	// product over the left-hand-side contravariant indices first.
-	Tensor<N1 + N2, M1 + M2, Dim> result;
+	Tensor<N1 + N2, M1 + M2, Dim, Scalar> result;
 	for (std::size_t index = 0; index < Dim; ++index) {
 		result[index] = lhs[index] * rhs;
 	}
 	return result;
 }
 
-template<std::size_t M1,
-         std::size_t N2, std::size_t M2,
-         std::size_t Dim>
-Tensor<N2, M1 + M2, Dim> operator*(Tensor<0, M1, Dim> const& lhs,
-                                   Tensor<N2, M2, Dim> const& rhs) {
+template<
+	std::size_t M1,
+	std::size_t N2, std::size_t M2,
+	std::size_t Dim,
+	typename Scalar>
+Tensor<N2, M1 + M2, Dim, Scalar> operator*(
+		Tensor<0, M1, Dim, Scalar> const& lhs,
+		Tensor<N2, M2, Dim, Scalar> const& rhs) {
 	// Second case: only the second tensor has contravariant indices. Since the
 	// contravariant indices must come first in the resulting tensor, take the
 	// product over the contravariant indices of the right-hand-side.
-	Tensor<N2, M1 + M2, Dim> result;
+	Tensor<N2, M1 + M2, Dim, Scalar> result;
 	for (std::size_t index = 0; index < Dim; ++index) {
 		result[index] = lhs * rhs[index];
 	}
 	return result;
 }
 
-template<std::size_t M1, std::size_t M2, std::size_t Dim>
-Tensor<0, M1 + M2, Dim> operator*(Tensor<0, M1, Dim> const& lhs,
-                                  Tensor<0, M2, Dim> const& rhs) {
+template<std::size_t M1, std::size_t M2, std::size_t Dim, typename Scalar>
+Tensor<0, M1 + M2, Dim, Scalar> operator*(
+		Tensor<0, M1, Dim, Scalar> const& lhs,
+		Tensor<0, M2, Dim, Scalar> const& rhs) {
 	// Third case: neither tensor has contravariant indices, so the covariant
 	// indices of the left-hand-side should come next.
-	Tensor<0, M1 + M2, Dim> result;
+	Tensor<0, M1 + M2, Dim, Scalar> result;
 	for (std::size_t index = 0; index < Dim; ++index) {
 		result[index] = lhs[index] * rhs;
 	}
 	return result;
 }
 
-template<std::size_t M2, std::size_t Dim>
-Tensor<0, M2, Dim> operator*(Tensor<0, 0, Dim> const& lhs,
-                             Tensor<0, M2, Dim> const& rhs) {
+template<std::size_t M2, std::size_t Dim, typename Scalar>
+Tensor<0, M2, Dim, Scalar> operator*(
+		Tensor<0, 0, Dim, Scalar> const& lhs,
+		Tensor<0, M2, Dim, Scalar> const& rhs) {
 	// Fourth case: the left-hand-side has no indices of any kind, meaning it
 	// is essentially a scalar. Simply take the scalar product of it with the
 	// right-hand-side. This is the base case.
 	return ((Scalar) lhs) * rhs;
 }
 
-template<std::size_t N, std::size_t M, std::size_t Dim>
-Tensor<N, M, Dim> operator+(Tensor<N, M, Dim> lhs,
-                            Tensor<N, M, Dim> const& rhs) {
+template<std::size_t N, std::size_t M, std::size_t Dim, typename Scalar>
+Tensor<N, M, Dim, Scalar> operator+(
+		Tensor<N, M, Dim, Scalar> lhs,
+		Tensor<N, M, Dim, Scalar> const& rhs) {
 	lhs += rhs;
 	return lhs;
 }
 
-template<std::size_t N, std::size_t M, std::size_t Dim>
-Tensor<N, M, Dim> operator-(Tensor<N, M, Dim> lhs,
-                            Tensor<N, M, Dim> const& rhs) {
+template<std::size_t N, std::size_t M, std::size_t Dim, typename Scalar>
+Tensor<N, M, Dim, Scalar> operator-(
+		Tensor<N, M, Dim, Scalar> lhs,
+		Tensor<N, M, Dim, Scalar> const& rhs) {
 	lhs -= rhs;
 	return lhs;
 }
 
-template<std::size_t N, std::size_t M, std::size_t Dim>
-Tensor<N, M, Dim> operator*(Scalar lhs, Tensor<N, M, Dim> rhs) {
+template<std::size_t N, std::size_t M, std::size_t Dim, typename Scalar>
+Tensor<N, M, Dim, Scalar> operator*(
+		Scalar lhs,
+		Tensor<N, M, Dim, Scalar> rhs) {
 	rhs *= lhs;
 	return rhs;
 }
 
-template<std::size_t N, std::size_t M, std::size_t Dim>
-Tensor<N, M, Dim> operator*(Tensor<N, M, Dim> lhs, Scalar rhs) {
+template<std::size_t N, std::size_t M, std::size_t Dim, typename Scalar>
+Tensor<N, M, Dim, Scalar> operator*(
+		Tensor<N, M, Dim, Scalar> lhs,
+		Scalar rhs) {
 	lhs *= rhs;
 	return lhs;
 }
 
-template<std::size_t N, std::size_t M, std::size_t Dim>
-Tensor<N, M, Dim> operator/(Tensor<N, M, Dim> lhs, Scalar rhs) {
+template<std::size_t N, std::size_t M, std::size_t Dim, typename Scalar>
+Tensor<N, M, Dim, Scalar> operator/(
+		Tensor<N, M, Dim, Scalar> lhs,
+		Scalar rhs) {
 	lhs /= rhs;
 	return lhs;
 }
