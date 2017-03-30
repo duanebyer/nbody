@@ -1,9 +1,8 @@
 #ifndef __NBODY_TENSOR_TENSOR_INDEX_EXPRESSION_H_
 #define __NBODY_TENSOR_TENSOR_INDEX_EXPRESSION_H_
 
-#include <algorithm>
-#include <iterator>
 #include <type_traits>
+#include <utility>
 
 #include "tensor.h"
 
@@ -19,53 +18,39 @@ enum class TensorIndex {
 };
 
 template<
-	std::size_t N, std::size_t M, std::size_t Dim, typename Scalar,
-	bool Const, bool IsRef>
-class TensorIndexReference final {
+	typename UpperIndices,
+	typename LowerIndices,
+	std::size_t Dim,
+	typename Scalar>
+class TensorIndexExpression;
+
+template<
+	TensorIndex... UpperIndices,
+	TensorIndex... LowerIndices,
+	std::size_t Dim,
+	typename Scalar>
+class TensorIndexExpression<
+		std::integer_sequence<TensorIndex, UpperIndices...>,
+		std::integer_sequence<TensorIndex, LowerIndices...>,
+		Dim,
+		Scalar> final {
 	
 private:
 	
-	using Tensor = std::conditional_t<
-		IsRef,
-		std::conditional_t<
-			Const,
-			Tensor<N, M, Dim, Scalar> const&,
-			Tensor<N, M, Dim, Scalar>&>
-		Tensor<N, M, Dim, Scalar> >;
+	using TensorType = Tensor<
+		sizeof...(UpperIndices),
+		sizeof...(LowerIndices),
+		Dim,
+		Scalar>;
 	
-	Tensor _tensor;
-	TensorIndex _upperIndices[N];
-	TensorIndex _lowerIndices[M];
+	TensorType _tensor;
 	
 	TensorIndexExpression(
-			Tensor tensor,
-			TensorIndex upperIndices[N],
-			TensorIndex lowerIndices[M]) :
+			TensorType tensor,
 			_tensor(tensor) {
-		std::copy(
-			std::begin(upperIndices),
-			std::end(upperIndices),
-			std::begin(_upperIndices));
-		std::copy(
-			std::begin(lowerIndices),
-			std::end(lowerIndices),
-			std::begin(_lowerIndices));
 	}
 	
 public:
-	
-	operator TensorIndexReference<N, M, Dim, Scalar, true, IsRef>() const {
-		return TensorIndexExpression<N, M, Dim, Scalar, true, Ref>(
-			_tensor,
-			_upperIndices,
-			_lowerIndices);
-	}
-	
-	template<typename Const_ = Const>
-	std::enable_if_t<Const_, void> operator=(
-			TensorIndexExpression<
-				N, M, Dim, Scalar,
-				Const, IsRef> const& rhs) const;
 	
 };
 
