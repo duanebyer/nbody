@@ -143,6 +143,14 @@ BOOST_AUTO_TEST_CASE(TypeListContainsTest) {
 	BOOST_CHECK(IDENTITY_VAL((contains_v<list, int, 9>)));
 }
 
+BOOST_AUTO_TEST_CASE(TypeListUniqueTest) {
+	BOOST_CHECK(IDENTITY_VAL((unique_v<emptyList>)));
+	BOOST_CHECK(IDENTITY_VAL((unique_v<singletonList>)));
+	BOOST_CHECK(IDENTITY_VAL((!unique_v<list>)));
+	BOOST_CHECK(IDENTITY_VAL((!unique_v<sortedList>)));
+	BOOST_CHECK(IDENTITY_VAL((unique_v<uniqueList>)));
+}
+
 BOOST_AUTO_TEST_CASE(TypeListMergeTest) {
 	BOOST_CHECK(IDENTITY_VAL((equal_v<
 		merge_t<emptyList, emptyList>,

@@ -207,6 +207,28 @@ constexpr bool contains_v = contains<List, T, Value>::value;
 
 
 /**
+ * \brief Type-level function that determines if every element in a list is
+ * unique.
+ */
+template<typename List>
+struct unique;
+template<typename List>
+constexpr bool unique_v = unique<List>::value;
+
+template<typename T>
+struct unique<std::integer_sequence<T> > : public std::true_type {
+};
+template<typename T, T Head, T... Tail>
+struct unique<std::integer_sequence<T, Head, Tail...> > :
+	public std::conditional_t<
+		contains_v<std::integer_sequence<T, Tail...>, T, Head>,
+		std::false_type,
+		unique<std::integer_sequence<T, Tail...> > > {
+};
+
+
+
+/**
  * \brief Type-level function that concatenates two lists together.
  */
 template<typename List1, typename List2>
