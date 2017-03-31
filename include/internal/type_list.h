@@ -9,6 +9,9 @@ namespace nbody {
 namespace internal {
 namespace typelist {
 
+/**
+ * \brief Type-level function that calculates the length of a list.
+ */
 template<typename List>
 struct length;
 template<typename List>
@@ -21,6 +24,9 @@ struct length<std::integer_sequence<T, Ts...> > :
 
 
 
+/**
+ * \brief Type-level function that determines if two lists are equal.
+ */
 template<typename List1, typename List2>
 struct equal;
 template<typename List1, typename List2>
@@ -58,6 +64,9 @@ struct equal<
 
 
 
+/**
+ * \brief Type-level function that inserts an element into a list.
+ */
 template<
 	typename List, std::size_t Index, typename T, T Value,
 	typename Enable = void>
@@ -84,6 +93,10 @@ struct insert<
 
 
 
+/**
+ * \brief Type-level function that gets the element from a certain index in a
+ * list.
+ */
 template<
 	typename List, std::size_t Index,
 	typename Enable = void>
@@ -104,6 +117,9 @@ struct get<
 
 
 
+/**
+ * \brief Type-level function that sets an element at a certain index of a list.
+ */
 template<
 	typename List, std::size_t Index, typename T, T Value,
 	typename Enable = void>
@@ -127,6 +143,10 @@ struct set<
 
 
 
+/**
+ * \brief Type-level function that determines how many times a certain element
+ * appears in a list.
+ */
 template<typename List, typename T, T Value>
 struct count;
 template<typename List, typename T, T Value>
@@ -148,6 +168,10 @@ struct count<std::integer_sequence<T, Head, Tail...>, T, Value> :
 
 
 
+/**
+ * \brief Type-level function that finds the index of the first occurence of an
+ * element in a list.
+ */
 template<typename List, typename T, T Value>
 struct find;
 template<typename List, typename T, T Value>
@@ -168,6 +192,10 @@ struct find<std::integer_sequence<T, Head, Tail...>, T, Value> :
 
 
 
+/**
+ * \brief Type-level function that determines if a list contains a certain
+ * element.
+ */
 template<typename List, typename T, T Value>
 using contains = std::conditional_t<
 	length_v<List> != find_v<List, T, Value>,
@@ -178,6 +206,9 @@ constexpr bool contains_v = contains<List, T, Value>::value;
 
 
 
+/**
+ * \brief Type-level function that concatenates two lists together.
+ */
 template<typename List1, typename List2>
 struct merge;
 template<typename List1, typename List2>
@@ -192,6 +223,10 @@ struct merge<
 
 
 
+/**
+ * \brief Type-level function that inserts an element into the appropriate
+ * location in an already-sorted list.
+ */
 template<typename List, typename T, T Value>
 struct insert_into_sorted;
 template<typename List, typename T, T Value>
@@ -214,6 +249,9 @@ struct insert_into_sorted<std::integer_sequence<T, Head, Tail...>, T, Value> {
 
 
 
+/**
+ * \brief Type-level function that sorts a list.
+ */
 template<typename List>
 struct sort;
 template<typename List>
@@ -232,6 +270,10 @@ struct sort<std::integer_sequence<T, Head, Tail...> > {
 
 
 
+/**
+ * \brief Type-level function that determines if one list is a permutation of
+ * another list.
+ */
 template<typename List1, typename List2>
 using is_permutation_of = equal<sort_t<List1>, sort_t<List2> >;
 template<typename List1, typename List2>
