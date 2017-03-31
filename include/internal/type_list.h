@@ -94,6 +94,86 @@ struct insert<
 
 
 /**
+ * \brief Type-level function that removes an element from a list by index.
+ */
+template<
+	typename List, std::size_t Index,
+	typename Enable = void>
+struct erase;
+template<typename List, std::size_t Index>
+using erase_t = typename erase<List, Index>::type;
+
+template<typename T, T Head, T... Tail>
+struct erase<std::integer_sequence<T, Head, Tail...>, 0> {
+	using type = std::integer_sequence<T, Tail...>;
+};
+template<typename T, T Head, T... Tail, std::size_t Index>
+struct erase<
+		std::integer_sequence<T, Head, Tail...>, Index,
+		std::enable_if_t<Index != 0> > {
+	using type = insert_t<
+		erase_t<
+			std::integer_sequence<T, Tail...>,
+			Index - 1>,
+		0,
+		T, Head>;
+};
+
+
+
+/**
+ * \brief Type-level function that removes a single element from a list by
+ * value.
+ */
+template<typename List, typename T, T Value>
+struct erase_value;
+template<typename List, typename T, T Value>
+using erase_value_t = typename erase_value<List, T, Value>::type;
+
+template<typename T, T Value>
+struct erase_value<std::integer_sequence<T>, T, Value> {
+	using type = std::integer_sequence<T>;
+};
+template<typename T, T Head, T... Tail, T Value>
+struct erase_value<std::integer_sequence<T, Head, Tail...>, T, Value> {
+	using type = std::conditional_t<
+		Head == Value,
+		std::integer_sequence<T, Tail...>,
+		insert_t<
+			erase_value_t<std::integer_sequence<T, Tail...>, T, Value>,
+			0,
+			T, Head> >;
+};
+
+
+
+/**
+ * \brief Type-level function that removes all elements of a certain value from
+ * a list.
+ */
+template<typename List, typename T, T Value>
+struct erase_all_value;
+template<typename List, typename T, T Value>
+using erase_all_value_t = typename erase_all_value<List, T, Value>::type;
+
+template<typename T, T Value>
+struct erase_all_value<std::integer_sequence<T>, T, Value> {
+	using type = std::integer_sequence<T>;
+};
+template<typename T, T Head, T... Tail, T Value>
+struct erase_all_value<std::integer_sequence<T, Head, Tail...>, T, Value> {
+	using type = std::conditional_t<
+		Head == Value,
+		erase_all_value_t<std::integer_sequence<T, Tail...>, T, Value>,
+		insert_t<
+			erase_all_value_t<std::integer_sequence<T, Tail...>, T, Value>,
+			0,
+			T, Head> >;
+};
+
+
+
+/**
  * \brief Type-level function that gets the element from a certain index in a
  * list.
  */
@@ -211,19 +291,42 @@ constexpr bool contains_v = contains<List, T, Value>::value;
  * unique.
  */
 template<typename List>
-struct unique;
+struct is_unique;
 template<typename List>
-constexpr bool unique_v = unique<List>::value;
+constexpr bool is_unique_v = is_unique<List>::value;
 
 template<typename T>
-struct unique<std::integer_sequence<T> > : public std::true_type {
+struct is_unique<std::integer_sequence<T> > : public std::true_type {
 };
 template<typename T, T Head, T... Tail>
-struct unique<std::integer_sequence<T, Head, Tail...> > :
+struct is_unique<std::integer_sequence<T, Head, Tail...> > :
 	public std::conditional_t<
 		contains_v<std::integer_sequence<T, Tail...>, T, Head>,
 		std::false_type,
-		unique<std::integer_sequence<T, Tail...> > > {
+		is_unique<std::integer_sequence<T, Tail...> > > {
+};
+
+
+
+/**
+ * \brief Type-level function that removes duplicates from a list.
+ */
+template<typename List>
+struct unique;
+template<typename List>
+using unique_t = typename unique<List>::type;
+
+template<typename T>
+struct unique<std::integer_sequence<T> > {
+	using type = std::integer_sequence<T>;
+};
+template<typename T, T Head, T... Tail>
+struct unique<std::integer_sequence<T, Head, Tail...> > {
+	using type = insert_t<
+		unique_t<
+			erase_all_value_t<std::integer_sequence<T, Tail...>, T, Head> >,
+		0,
+		T, Head>;
 };
 
 
@@ -241,6 +344,144 @@ struct merge<
 		std::integer_sequence<T, Ts1...>,
 		std::integer_sequence<T, Ts2...> > {
 	using type = std::integer_sequence<T, Ts1..., Ts2...>;
+};
+
+
+
+/**
+ * \brief Type-level function that finds all elements that exist in either list.
+ * 
+ * Duplicate elements are handled like `std::set_union`.
+ */
+template<typename List1, typename List2>
+struct set_union;
+template<typename List1, typename List2>
+using set_union_t = typename set_union<List1, List2>::type;
+
+template<typename T, T... Ts>
+struct set_union<
+		std::integer_sequence<T>,
+		std::integer_sequence<T, Ts...> > {
+	using type = std::integer_sequence<T, Ts...>;
+};
+template<typename T, T Head, T... Tail, T... Ts>
+struct set_union<
+		std::integer_sequence<T, Head, Tail...>,
+		std::integer_sequence<T, Ts...> > {
+	using type = insert_t<
+		set_union_t<
+			std::integer_sequence<T, Tail...>,
+			erase_value_t<std::integer_sequence<T, Ts...>, T, Head> >,
+		0,
+		T, Head>;
+};
+
+
+
+/**
+ * \brief Type-level function that finds all elements contained in both lists.
+ * 
+ * Duplicate elements are handled like `std::set_intersection`.
+ */
+template<typename List1, typename List2>
+struct set_intersection;
+template<typename List1, typename List2>
+using set_intersection_t = typename set_intersection<List1, List2>::type;
+
+template<typename T, T... Ts>
+struct set_intersection<
+		std::integer_sequence<T>,
+		std::integer_sequence<T, Ts...> > {
+	using type = std::integer_sequence<T>;
+};
+template<typename T, T Head, T... Tail, T... Ts>
+struct set_intersection<
+		std::integer_sequence<T, Head, Tail...>,
+		std::integer_sequence<T, Ts...> > {
+	using type = std::conditional_t<
+		contains_v<std::integer_sequence<T, Ts...>, T, Head>,
+		insert_t<
+			set_intersection_t<
+				std::integer_sequence<T, Tail...>,
+				erase_value_t<std::integer_sequence<T, Ts...>, T, Head> >,
+			0,
+			T, Head>,
+		set_intersection_t<
+			std::integer_sequence<T, Tail...>,
+			std::integer_sequence<T, Ts...> > >;
+};
+
+
+
+/**
+ * \brief Type-level function that finds all elements contains in one of the
+ * lists, but not both.
+ * 
+ * Duplicate elements are handled like `std::set_symmetric_difference`.
+ */
+template<typename List1, typename List2>
+struct set_symmetric_difference;
+template<typename List1, typename List2>
+using set_symmetric_difference_t =
+	typename set_symmetric_difference<List1, List2>::type;
+
+template<typename T, T... Ts>
+struct set_symmetric_difference<
+		std::integer_sequence<T>,
+		std::integer_sequence<T, Ts...> > {
+	using type = std::integer_sequence<T, Ts...>;
+};
+template<typename T, T Head, T... Tail, T... Ts>
+struct set_symmetric_difference<
+		std::integer_sequence<T, Head, Tail...>,
+		std::integer_sequence<T, Ts...> > {
+	using type = std::conditional_t<
+		!contains_v<std::integer_sequence<T, Ts...>, T, Head>,
+		insert_t<
+			set_symmetric_difference_t<
+				std::integer_sequence<T, Tail...>,
+				std::integer_sequence<T, Ts...> >,
+			0,
+			T, Head>,
+		set_symmetric_difference_t<
+			std::integer_sequence<T, Tail...>,
+			erase_value_t<std::integer_sequence<T, Ts...>, T, Head> > >;
+};
+
+
+
+/**
+ * \brief Type-level function that finds all elements contained in the first
+ * list that are not contained in the second list.
+ * 
+ * Duplicate elements are handled like `std::set_difference`.
+ */
+template<typename List1, typename List2>
+struct set_difference;
+template<typename List1, typename List2>
+using set_difference_t = typename set_difference<List1, List2>::type;
+
+template<typename T, T... Ts>
+struct set_difference<
+		std::integer_sequence<T>,
+		std::integer_sequence<T, Ts...> > {
+	using type = std::integer_sequence<T>;
+};
+template<typename T, T Head, T... Tail, T... Ts>
+struct set_difference<
+		std::integer_sequence<T, Head, Tail...>,
+		std::integer_sequence<T, Ts...> > {
+	using type = std::conditional_t<
+		!contains_v<std::integer_sequence<T, Ts...>, T, Head>,
+		insert_t<
+			set_difference_t<
+				std::integer_sequence<T, Tail...>,
+				std::integer_sequence<T, Ts...> >,
+			0,
+			T, Head>,
+		set_difference_t<
+			std::integer_sequence<T, Tail...>,
+			erase_value_t<std::integer_sequence<T, Ts...>, T, Head> > >;
 };
 
 

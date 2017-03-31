@@ -19,40 +19,29 @@ using namespace nbody::internal::typelist;
 // A set of type level lists that are used to test various cases.
 using emptyList = std::integer_sequence<int>;
 using singletonList = std::integer_sequence<int, 4>;
-using list = std::integer_sequence<
-	int, 6, 8, 3, 4, 6, 5, 5, 4, 2, 4, 8, 9>;
-using insertStartList = std::integer_sequence<
-	int, 0, 6, 8, 3, 4, 6, 5, 5, 4, 2, 4, 8, 9>;
-using insertMiddleList = std::integer_sequence<
-	int, 6, 8, 3, 4, 6, 5, 0, 5, 4, 2, 4, 8, 9>;
-using insertEndList = std::integer_sequence<
-	int, 6, 8, 3, 4, 6, 5, 5, 4, 2, 4, 8, 9, 0>;
-using setStartList = std::integer_sequence<
-	int, 0, 8, 3, 4, 6, 5, 5, 4, 2, 4, 8, 9>;
-using setMiddleList = std::integer_sequence<
-	int, 6, 8, 3, 4, 6, 5, 0, 4, 2, 4, 8, 9>;
-using setEndList = std::integer_sequence<
-	int, 6, 8, 3, 4, 6, 5, 5, 4, 2, 4, 8, 0>;
-using mergeStartList = std::integer_sequence<
-	int, 4, 6, 8, 3, 4, 6, 5, 5, 4, 2, 4, 8, 9>;
-using mergeEndList = std::integer_sequence<
-	int, 6, 8, 3, 4, 6, 5, 5, 4, 2, 4, 8, 9, 4>;
-using mergedList = std::integer_sequence<
-	int, 6, 8, 3, 4, 6, 5, 5, 4, 2, 4, 8, 9, 6, 3, 4, 8, 9, 1, 2, 7, 5, 0>;
-using sortedList = std::integer_sequence<
-	int, 2, 3, 4, 4, 4, 5, 5, 6, 6, 8, 8, 9>;
-using reverseList = std::integer_sequence<
-	int, 9, 8, 8, 6, 6, 5, 5, 4, 4, 4, 3, 2>;
-using permutedList = std::integer_sequence<
-	int, 8, 5, 4, 2, 8, 9, 5, 4, 6, 4, 6, 3>;
-using uniqueList = std::integer_sequence<
-	int, 6, 3, 4, 8, 9, 1, 2, 7, 5, 0>;
+using list = std::integer_sequence<int,
+	6, 8, 3, 4, 6, 5, 5, 4, 2, 4, 8, 9>;
+using otherList = std::integer_sequence<int,
+	9, 8, 7, 8, 9, 2, 4, 6, 7, 7, 4, 1, 1, 3, 6, 0, 9, 9>;
+using sortedList = std::integer_sequence<int,
+	2, 3, 4, 4, 4, 5, 5, 6, 6, 8, 8, 9>;
+using reversedList = std::integer_sequence<int,
+	9, 8, 8, 6, 6, 5, 5, 4, 4, 4, 3, 2>;
+using permutedList = std::integer_sequence<int,
+	8, 5, 4, 2, 8, 9, 5, 4, 6, 4, 6, 3>;
+using uniqueList = std::integer_sequence<int,
+	6, 8, 3, 4, 5, 2, 9>;
+using symmetricDifferenceList = std::integer_sequence<int,
+	5, 5, 2, 4,
+	7, 9, 2, 7, 7, 1, 1, 0, 9, 9>;
+using differenceList = std::integer_sequence<int,
+	5, 5, 2, 4>;
 
 BOOST_AUTO_TEST_CASE(TypeListLengthTest) {
 	BOOST_CHECK_EQUAL(length_v<emptyList>, 0);
 	BOOST_CHECK_EQUAL(length_v<singletonList>, 1);
 	BOOST_CHECK_EQUAL(length_v<list>, 12);
-	BOOST_CHECK_EQUAL(length_v<uniqueList>, 10);
+	BOOST_CHECK_EQUAL(length_v<otherList>, 18);
 }
 
 BOOST_AUTO_TEST_CASE(TypeListEqualTest) {
@@ -74,14 +63,105 @@ BOOST_AUTO_TEST_CASE(TypeListInsertTest) {
 		insert_t<emptyList, 0, int, 4>,
 		singletonList>)));
 	BOOST_CHECK(IDENTITY_VAL((equal_v<
-		insert_t<list, 0, int, 0>,
-		insertStartList>)));
+		insert_t<list, 0, int, 7>,
+		std::integer_sequence<int,
+			7, 6, 8, 3, 4, 6, 5, 5, 4, 2, 4, 8, 9> >)));
 	BOOST_CHECK(IDENTITY_VAL((equal_v<
-		insert_t<list, 6, int, 0>,
-		insertMiddleList>)));
+		insert_t<list, 6, int, 1>,
+		std::integer_sequence<int,
+			6, 8, 3, 4, 6, 5, 1, 5, 4, 2, 4, 8, 9> >)));
+	BOOST_CHECK(IDENTITY_VAL((equal_v<
+		insert_t<list, 11, int, 1>,
+		std::integer_sequence<int,
+			6, 8, 3, 4, 6, 5, 5, 4, 2, 4, 8, 1, 9> >)));
 	BOOST_CHECK(IDENTITY_VAL((equal_v<
 		insert_t<list, 12, int, 0>,
-		insertEndList>)));
+		std::integer_sequence<int,
+			6, 8, 3, 4, 6, 5, 5, 4, 2, 4, 8, 9, 0> >)));
+}
+
+BOOST_AUTO_TEST_CASE(TypeListEraseTest) {
+	BOOST_CHECK(IDENTITY_VAL((equal_v<
+		erase_t<singletonList, 0>,
+		emptyList>)));
+	BOOST_CHECK(IDENTITY_VAL((equal_v<
+		erase_t<list, 0>,
+		std::integer_sequence<int,
+			8, 3, 4, 6, 5, 5, 4, 2, 4, 8, 9> >)));
+	BOOST_CHECK(IDENTITY_VAL((equal_v<
+		erase_t<list, 6>,
+		std::integer_sequence<int,
+			6, 8, 3, 4, 6, 5, 4, 2, 4, 8, 9> >)));
+	BOOST_CHECK(IDENTITY_VAL((equal_v<
+		erase_t<list, 11>,
+		std::integer_sequence<int,
+			6, 8, 3, 4, 6, 5, 5, 4, 2, 4, 8> >)));
+}
+
+BOOST_AUTO_TEST_CASE(TypeListEraseValueTest) {
+	BOOST_CHECK(IDENTITY_VAL((equal_v<
+		erase_value_t<emptyList, int, 1>,
+		emptyList>)));
+	BOOST_CHECK(IDENTITY_VAL((equal_v<
+		erase_value_t<singletonList, int, 4>,
+		emptyList>)));
+	BOOST_CHECK(IDENTITY_VAL((equal_v<
+		erase_value_t<singletonList, int, 2>,
+		singletonList>)));
+	
+	BOOST_CHECK(IDENTITY_VAL((equal_v<
+		erase_value_t<list, int, 6>,
+		std::integer_sequence<int,
+			8, 3, 4, 6, 5, 5, 4, 2, 4, 8, 9> >)));
+	BOOST_CHECK(IDENTITY_VAL((equal_v<
+		erase_value_t<list, int, 9>,
+		std::integer_sequence<int,
+			6, 8, 3, 4, 6, 5, 5, 4, 2, 4, 8> >)));
+	BOOST_CHECK(IDENTITY_VAL((equal_v<
+		erase_value_t<list, int, 2>,
+		std::integer_sequence<int,
+			6, 8, 3, 4, 6, 5, 5, 4, 4, 8, 9> >)));
+	BOOST_CHECK(IDENTITY_VAL((equal_v<
+		erase_value_t<list, int, 4>,
+		std::integer_sequence<int,
+			6, 8, 3, 6, 5, 5, 4, 2, 4, 8, 9> >)));
+	BOOST_CHECK(IDENTITY_VAL((equal_v<
+		erase_value_t<list, int, 1>,
+		std::integer_sequence<int,
+			6, 8, 3, 4, 6, 5, 5, 4, 2, 4, 8, 9> >)));
+}
+
+BOOST_AUTO_TEST_CASE(TypeListEraseAllValueTest) {
+	BOOST_CHECK(IDENTITY_VAL((equal_v<
+		erase_all_value_t<emptyList, int, 1>,
+		emptyList>)));
+	BOOST_CHECK(IDENTITY_VAL((equal_v<
+		erase_all_value_t<singletonList, int, 4>,
+		emptyList>)));
+	BOOST_CHECK(IDENTITY_VAL((equal_v<
+		erase_all_value_t<singletonList, int, 2>,
+		singletonList>)));
+	
+	BOOST_CHECK(IDENTITY_VAL((equal_v<
+		erase_all_value_t<list, int, 6>,
+		std::integer_sequence<int,
+			8, 3, 4, 5, 5, 4, 2, 4, 8, 9> >)));
+	BOOST_CHECK(IDENTITY_VAL((equal_v<
+		erase_all_value_t<list, int, 9>,
+		std::integer_sequence<int,
+			6, 8, 3, 4, 6, 5, 5, 4, 2, 4, 8> >)));
+	BOOST_CHECK(IDENTITY_VAL((equal_v<
+		erase_all_value_t<list, int, 2>,
+		std::integer_sequence<int,
+			6, 8, 3, 4, 6, 5, 5, 4, 4, 8, 9> >)));
+	BOOST_CHECK(IDENTITY_VAL((equal_v<
+		erase_all_value_t<list, int, 4>,
+		std::integer_sequence<int,
+			6, 8, 3, 6, 5, 5, 2, 8, 9> >)));
+	BOOST_CHECK(IDENTITY_VAL((equal_v<
+		erase_all_value_t<list, int, 1>,
+		std::integer_sequence<int,
+			6, 8, 3, 4, 6, 5, 5, 4, 2, 4, 8, 9> >)));
 }
 
 BOOST_AUTO_TEST_CASE(TypeListGetTest) {
@@ -96,14 +176,17 @@ BOOST_AUTO_TEST_CASE(TypeListSetTest) {
 		set_t<singletonList, 0, int, 5>,
 		std::integer_sequence<int, 5> >)));
 	BOOST_CHECK(IDENTITY_VAL((equal_v<
-		set_t<list, 0, int, 0>,
-		setStartList>)));
+		set_t<list, 0, int, 1>,
+		std::integer_sequence<int,
+			1, 8, 3, 4, 6, 5, 5, 4, 2, 4, 8, 9> >)));
 	BOOST_CHECK(IDENTITY_VAL((equal_v<
-		set_t<list, 6, int, 0>,
-		setMiddleList>)));
+		set_t<list, 6, int, 9>,
+		std::integer_sequence<int,
+			6, 8, 3, 4, 6, 5, 9, 4, 2, 4, 8, 9> >)));
 	BOOST_CHECK(IDENTITY_VAL((equal_v<
 		set_t<list, 11, int, 0>,
-		setEndList>)));
+		std::integer_sequence<int,
+			6, 8, 3, 4, 6, 5, 5, 4, 2, 4, 8, 0> >)));
 }
 
 BOOST_AUTO_TEST_CASE(TypeListCountTest) {
@@ -143,12 +226,24 @@ BOOST_AUTO_TEST_CASE(TypeListContainsTest) {
 	BOOST_CHECK(IDENTITY_VAL((contains_v<list, int, 9>)));
 }
 
+BOOST_AUTO_TEST_CASE(TypeListIsUniqueTest) {
+	BOOST_CHECK(IDENTITY_VAL((is_unique_v<emptyList>)));
+	BOOST_CHECK(IDENTITY_VAL((is_unique_v<singletonList>)));
+	BOOST_CHECK(IDENTITY_VAL((!is_unique_v<list>)));
+	BOOST_CHECK(IDENTITY_VAL((!is_unique_v<sortedList>)));
+	BOOST_CHECK(IDENTITY_VAL((is_unique_v<uniqueList>)));
+}
+
 BOOST_AUTO_TEST_CASE(TypeListUniqueTest) {
-	BOOST_CHECK(IDENTITY_VAL((unique_v<emptyList>)));
-	BOOST_CHECK(IDENTITY_VAL((unique_v<singletonList>)));
-	BOOST_CHECK(IDENTITY_VAL((!unique_v<list>)));
-	BOOST_CHECK(IDENTITY_VAL((!unique_v<sortedList>)));
-	BOOST_CHECK(IDENTITY_VAL((unique_v<uniqueList>)));
+	BOOST_CHECK(IDENTITY_VAL((equal_v<
+		unique_t<emptyList>,
+		emptyList>)));
+	BOOST_CHECK(IDENTITY_VAL((equal_v<
+		unique_t<singletonList>,
+		singletonList>)));
+	BOOST_CHECK(IDENTITY_VAL((equal_v<
+		unique_t<list>,
+		uniqueList>)));
 }
 
 BOOST_AUTO_TEST_CASE(TypeListMergeTest) {
@@ -161,21 +256,216 @@ BOOST_AUTO_TEST_CASE(TypeListMergeTest) {
 	BOOST_CHECK(IDENTITY_VAL((equal_v<
 		merge_t<singletonList, emptyList>,
 		singletonList>)));
+	
 	BOOST_CHECK(IDENTITY_VAL((equal_v<
 		merge_t<emptyList, list>,
 		list>)));
 	BOOST_CHECK(IDENTITY_VAL((equal_v<
 		merge_t<list, emptyList>,
 		list>)));
+	
 	BOOST_CHECK(IDENTITY_VAL((equal_v<
 		merge_t<singletonList, list>,
-		mergeStartList>)));
+		insert_t<list, 0, int, 4> >)));
 	BOOST_CHECK(IDENTITY_VAL((equal_v<
 		merge_t<list, singletonList>,
-		mergeEndList>)));
+		insert_t<list, 12, int, 4> >)));
+	
 	BOOST_CHECK(IDENTITY_VAL((equal_v<
-		merge_t<list, uniqueList>,
-		mergedList>)));
+		merge_t<list, otherList>,
+		std::integer_sequence<int,
+			6, 8, 3, 4, 6, 5, 5, 4, 2, 4, 8, 9,
+			9, 8, 7, 8, 9, 2, 4, 6, 7, 7, 4, 1, 1, 3, 6, 0, 9, 9> >)));
+	BOOST_CHECK(IDENTITY_VAL((equal_v<
+		merge_t<otherList, list>,
+		std::integer_sequence<int,
+			9, 8, 7, 8, 9, 2, 4, 6, 7, 7, 4, 1, 1, 3, 6, 0, 9, 9,
+			6, 8, 3, 4, 6, 5, 5, 4, 2, 4, 8, 9> >)));
+}
+
+BOOST_AUTO_TEST_CASE(TypeListSetUnionTest) {
+	BOOST_CHECK(IDENTITY_VAL((equal_v<
+		set_union_t<emptyList, emptyList>,
+		emptyList>)));
+	BOOST_CHECK(IDENTITY_VAL((equal_v<
+		set_union_t<emptyList, singletonList>,
+		singletonList>)));
+	BOOST_CHECK(IDENTITY_VAL((equal_v<
+		set_union_t<singletonList, emptyList>,
+		singletonList>)));
+	
+	BOOST_CHECK(IDENTITY_VAL((equal_v<
+		set_union_t<emptyList, list>,
+		list>)));
+	BOOST_CHECK(IDENTITY_VAL((equal_v<
+		set_union_t<list, emptyList>,
+		list>)));
+	BOOST_CHECK(IDENTITY_VAL((equal_v<
+		set_union_t<std::integer_sequence<int, 4>, list>,
+		std::integer_sequence<int,
+			4, 6, 8, 3, 6, 5, 5, 4, 2, 4, 8, 9> >)));
+	BOOST_CHECK(IDENTITY_VAL((equal_v<
+		set_union_t<list, std::integer_sequence<int, 4> >,
+		std::integer_sequence<int,
+			6, 8, 3, 4, 6, 5, 5, 4, 2, 4, 8, 9> >)));
+	BOOST_CHECK(IDENTITY_VAL((equal_v<
+		set_union_t<std::integer_sequence<int, 1>, list>,
+		std::integer_sequence<int,
+			1, 6, 8, 3, 4, 6, 5, 5, 4, 2, 4, 8, 9> >)));
+	BOOST_CHECK(IDENTITY_VAL((equal_v<
+		set_union_t<list, std::integer_sequence<int, 1> >,
+		std::integer_sequence<int,
+			6, 8, 3, 4, 6, 5, 5, 4, 2, 4, 8, 9, 1> >)));
+	
+	BOOST_CHECK(IDENTITY_VAL((equal_v<
+		set_union_t<list, list>,
+		list>)));
+	BOOST_CHECK(IDENTITY_VAL((equal_v<
+		set_union_t<list, otherList>,
+		std::integer_sequence<int,
+			6, 8, 3, 4, 6, 5, 5, 4, 2, 4, 8, 9,
+			7, 9, 7, 7, 1, 1, 0, 9, 9> >)));
+	BOOST_CHECK(IDENTITY_VAL((equal_v<
+		set_union_t<otherList, list>,
+		std::integer_sequence<int,
+			9, 8, 7, 8, 9, 2, 4, 6, 7, 7, 4, 1, 1, 3, 6, 0, 9, 9,
+			5, 5, 4> >)));
+}
+
+BOOST_AUTO_TEST_CASE(TypeListSetIntersectionTest) {
+	BOOST_CHECK(IDENTITY_VAL((equal_v<
+		set_intersection_t<emptyList, emptyList>,
+		emptyList>)));
+	BOOST_CHECK(IDENTITY_VAL((equal_v<
+		set_intersection_t<emptyList, singletonList>,
+		emptyList>)));
+	BOOST_CHECK(IDENTITY_VAL((equal_v<
+		set_intersection_t<singletonList, emptyList>,
+		emptyList>)));
+	
+	BOOST_CHECK(IDENTITY_VAL((equal_v<
+		set_intersection_t<emptyList, list>,
+		emptyList>)));
+	BOOST_CHECK(IDENTITY_VAL((equal_v<
+		set_intersection_t<list, emptyList>,
+		emptyList>)));
+	BOOST_CHECK(IDENTITY_VAL((equal_v<
+		set_intersection_t<std::integer_sequence<int, 4>, list>,
+		std::integer_sequence<int, 4> >)));
+	BOOST_CHECK(IDENTITY_VAL((equal_v<
+		set_intersection_t<list, std::integer_sequence<int, 4> >,
+		std::integer_sequence<int, 4> >)));
+	BOOST_CHECK(IDENTITY_VAL((equal_v<
+		set_intersection_t<std::integer_sequence<int, 1>, list>,
+		emptyList>)));
+	BOOST_CHECK(IDENTITY_VAL((equal_v<
+		set_intersection_t<list, std::integer_sequence<int, 1> >,
+		emptyList>)));
+	
+	BOOST_CHECK(IDENTITY_VAL((equal_v<
+		set_intersection_t<list, list>,
+		list>)));
+	BOOST_CHECK(IDENTITY_VAL((equal_v<
+		set_intersection_t<list, otherList>,
+		std::integer_sequence<int,
+			6, 8, 3, 4, 6, 4, 2, 8, 9> >)));
+	BOOST_CHECK(IDENTITY_VAL((equal_v<
+		set_intersection_t<otherList, list>,
+		std::integer_sequence<int,
+			9, 8, 8, 2, 4, 6, 4, 3, 6> >)));
+}
+
+BOOST_AUTO_TEST_CASE(TypeListSetSymmetricDifferenceTest) {
+	BOOST_CHECK(IDENTITY_VAL((equal_v<
+		set_symmetric_difference_t<emptyList, emptyList>,
+		emptyList>)));
+	BOOST_CHECK(IDENTITY_VAL((equal_v<
+		set_symmetric_difference_t<emptyList, singletonList>,
+		singletonList>)));
+	BOOST_CHECK(IDENTITY_VAL((equal_v<
+		set_symmetric_difference_t<singletonList, emptyList>,
+		singletonList>)));
+	
+	BOOST_CHECK(IDENTITY_VAL((equal_v<
+		set_symmetric_difference_t<emptyList, list>,
+		list>)));
+	BOOST_CHECK(IDENTITY_VAL((equal_v<
+		set_symmetric_difference_t<list, emptyList>,
+		list>)));
+	BOOST_CHECK(IDENTITY_VAL((equal_v<
+		set_symmetric_difference_t<std::integer_sequence<int, 4>, list>,
+		std::integer_sequence<int,
+			6, 8, 3, 6, 5, 5, 4, 2, 4, 8, 9> >)));
+	BOOST_CHECK(IDENTITY_VAL((equal_v<
+		set_symmetric_difference_t<list, std::integer_sequence<int, 4> >,
+		std::integer_sequence<int,
+			6, 8, 3, 6, 5, 5, 4, 2, 4, 8, 9> >)));
+	BOOST_CHECK(IDENTITY_VAL((equal_v<
+		set_symmetric_difference_t<std::integer_sequence<int, 1>, list>,
+		std::integer_sequence<int,
+			1, 6, 8, 3, 4, 6, 5, 5, 4, 2, 4, 8, 9> >)));
+	BOOST_CHECK(IDENTITY_VAL((equal_v<
+		set_symmetric_difference_t<list, std::integer_sequence<int, 1> >,
+		std::integer_sequence<int,
+			6, 8, 3, 4, 6, 5, 5, 4, 2, 4, 8, 9, 1> >)));
+	
+	BOOST_CHECK(IDENTITY_VAL((equal_v<
+		set_symmetric_difference_t<list, list>,
+		emptyList>)));
+	BOOST_CHECK(IDENTITY_VAL((equal_v<
+		set_symmetric_difference_t<list, otherList>,
+		std::integer_sequence<int,
+			5, 5, 4,
+			7, 9, 7, 7, 1, 1, 0, 9, 9> >)));
+	BOOST_CHECK(IDENTITY_VAL((equal_v<
+		set_symmetric_difference_t<otherList, list>,
+		std::integer_sequence<int,
+			7, 9, 7, 7, 1, 1, 0, 9, 9,
+			5, 5, 4> >)));
+}
+
+BOOST_AUTO_TEST_CASE(TypeListSetDifferenceTest) {
+	BOOST_CHECK(IDENTITY_VAL((equal_v<
+		set_difference_t<emptyList, emptyList>,
+		emptyList>)));
+	BOOST_CHECK(IDENTITY_VAL((equal_v<
+		set_difference_t<emptyList, singletonList>,
+		emptyList>)));
+	BOOST_CHECK(IDENTITY_VAL((equal_v<
+		set_difference_t<singletonList, emptyList>,
+		singletonList>)));
+	
+	BOOST_CHECK(IDENTITY_VAL((equal_v<
+		set_difference_t<emptyList, list>,
+		emptyList>)));
+	BOOST_CHECK(IDENTITY_VAL((equal_v<
+		set_difference_t<list, emptyList>,
+		list>)));
+	BOOST_CHECK(IDENTITY_VAL((equal_v<
+		set_difference_t<std::integer_sequence<int, 4>, list>,
+		emptyList>)));
+	BOOST_CHECK(IDENTITY_VAL((equal_v<
+		set_difference_t<list, std::integer_sequence<int, 4> >,
+		std::integer_sequence<int,
+			6, 8, 3, 6, 5, 5, 4, 2, 4, 8, 9> >)));
+	BOOST_CHECK(IDENTITY_VAL((equal_v<
+		set_difference_t<std::integer_sequence<int, 1>, list>,
+		std::integer_sequence<int, 1> >)));
+	BOOST_CHECK(IDENTITY_VAL((equal_v<
+		set_difference_t<list, std::integer_sequence<int, 1> >,
+		list>)));
+	
+	BOOST_CHECK(IDENTITY_VAL((equal_v<
+		set_difference_t<list, list>,
+		emptyList>)));
+	BOOST_CHECK(IDENTITY_VAL((equal_v<
+		set_difference_t<list, otherList>,
+		std::integer_sequence<int,
+			5, 5, 4> >)));
+	BOOST_CHECK(IDENTITY_VAL((equal_v<
+		set_difference_t<otherList, list>,
+		std::integer_sequence<int,
+			7, 9, 7, 7, 1, 1, 0, 9, 9> >)));
 }
 
 BOOST_AUTO_TEST_CASE(TypeListSortTest) {
@@ -189,7 +479,7 @@ BOOST_AUTO_TEST_CASE(TypeListSortTest) {
 		sort_t<sortedList>,
 		sortedList>)));
 	BOOST_CHECK(IDENTITY_VAL((equal_v<
-		sort_t<reverseList>,
+		sort_t<reversedList>,
 		sortedList>)));
 	BOOST_CHECK(IDENTITY_VAL((equal_v<
 		sort_t<permutedList>,
@@ -227,7 +517,7 @@ BOOST_AUTO_TEST_CASE(TypeListIsPermutationOfTest) {
 		sortedList>)));
 	BOOST_CHECK(IDENTITY_VAL((is_permutation_of_v<
 		list,
-		reverseList>)));
+		reversedList>)));
 	BOOST_CHECK(IDENTITY_VAL((!is_permutation_of_v<
 		list,
 		uniqueList>)));
