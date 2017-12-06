@@ -1,6 +1,10 @@
 # nbody
 Simple n-body gravitatational simulation using the fast multipole method (FMM).
 
+## Building
+This project can be built using CMake. Note that it depends on the `glade`
+repositories (created also by me).
+
 ## Introduction
 This project aimed to implement the fast multipole method on the GPU using
 octrees to spatially partition the particles. In the end, it wasn't very
