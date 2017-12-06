@@ -1,0 +1,7 @@
+Current goals:
+ * features
+   > variable timestep
+   > arbitrary degree of multipole expansion
+   > arbitrary degree of Taylor expansion
+ * other
+  > determine whether buffers should be read/write. some are wrong right now
